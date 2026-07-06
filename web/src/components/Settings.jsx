@@ -34,7 +34,7 @@ function UploadRow({ label, accept, hint, onUpload, children }) {
   )
 }
 
-export default function Settings({ me, setMe, nickname, setNickname, onLogout }) {
+export default function Settings({ me, setMe, nickname, setNickname, theme, setTheme, onLogout }) {
   const [name, setName] = useState(me.displayName)
   const [nick, setNick] = useState(nickname)
   const [saved, setSaved] = useState('')
@@ -70,6 +70,18 @@ export default function Settings({ me, setMe, nickname, setNickname, onLogout })
           <div className="setting-control">
             <input value={name} onChange={(e) => setName(e.target.value)} />
             <button className="ghost-btn" onClick={saveName} disabled={!name.trim()}>Save</button>
+          </div>
+        </div>
+
+        <div className="setting-row">
+          <div className="setting-label">Appearance<small>Just on this device</small></div>
+          <div className="setting-control">
+            <button
+              className="ghost-btn"
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            >
+              {theme === 'dark' ? '☀️ Switch to light' : '🌙 Switch to dark'}
+            </button>
           </div>
         </div>
 

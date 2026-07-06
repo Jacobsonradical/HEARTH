@@ -834,3 +834,48 @@ input:focus, textarea:focus { border-color: var(--pink-deep); }
   .setting-control input { width: 120px; }
   .tabs button { padding: 8px 10px; }
 }
+
+/* --- Dark mode --------------------------------------------------------------
+   A crisp, high-contrast night theme: deep warm plum surfaces, bright text,
+   and the same pink accents glowing against the dark. Toggled per device from
+   Settings (class "dark" on <html>). The garden keeps its own real sky. */
+:root.dark {
+  --ink: #ece5f0;
+  --ink-soft: #a89aae;
+  --bubble-mine: #55324b;
+  --bubble-theirs: #2e3d5e;
+  --shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+:root.dark body {
+  background: linear-gradient(160deg, #171420 0%, #221a28 45%, #1a1622 100%);
+}
+
+/* Shell */
+.dark .tabs button { background: rgba(255, 255, 255, 0.08); color: var(--ink); }
+.dark .tabs button.active { background: #332b40; color: #ff9fc0; }
+
+/* Chat */
+.dark .chat { background: rgba(30, 25, 40, 0.78); }
+.dark .chat-header, .dark .composer { background: rgba(38, 32, 50, 0.9); }
+.dark input, .dark textarea { background: #2a2436; color: var(--ink); }
+.dark .icon-btn { background: #332b40; }
+.dark .avatar-fallback { background: #3a3348; }
+.dark .bubble { box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35); }
+
+/* Login / setup */
+.dark .login-card { background: rgba(33, 28, 44, 0.88); }
+.dark .setup-person { background: rgba(255, 255, 255, 0.06); }
+
+/* Settings */
+.dark .setting-card { background: rgba(33, 28, 44, 0.85); }
+.dark .setting-row { border-bottom-color: rgba(255, 255, 255, 0.07); }
+.dark .ghost-btn { background: #3a3154; color: #cfc2f5; }
+.dark .address-code { background: #2a2436; }
+.dark .address-hint code { background: rgba(255, 255, 255, 0.12); }
+.dark .logout-btn { background: #4a2b31; color: #ff9d9d; }
+
+/* Garden panel (the sky above stays true to the real time of day) */
+.dark .garden-panel { background: rgba(28, 23, 38, 0.88); }
+.dark .garden-stage-name { color: #a3d489; }
+.dark .growth-bar { background: #3a3348; }
+.dark .garden-btn { background: #332b40; color: var(--ink); }

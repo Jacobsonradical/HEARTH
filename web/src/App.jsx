@@ -15,6 +15,13 @@ export default function App() {
   const [partner, setPartner] = useState(null)
   const [nickname, setNickname] = useState('') // what I privately call my partner
   const [tab, setTab] = useState('chat')
+  // Theme is a per-device choice, so it lives in localStorage, not the server.
+  const [theme, setTheme] = useState(() => localStorage.getItem('hearth_theme') || 'light')
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', theme === 'dark')
+    localStorage.setItem('hearth_theme', theme)
+  }, [theme])
 
   const [messages, setMessages] = useState([])
   const [garden, setGarden] = useState(null)
@@ -191,8 +198,9 @@ export default function App() {
   }, [me, loadMe, playNotif, sendStatus])
 
   // Keep an unread count in the tab title so a buzz is visible at a glance.
+  // (The tab's hearth icon comes from the favicon, so the title stays plain.)
   useEffect(() => {
-    document.title = unread > 0 ? `(${unread}) Hearth 🏡` : 'Hearth 🏡'
+    document.title = unread > 0 ? `(${unread}) Hearth` : 'Hearth'
   }, [unread])
 
   // Track whether the window/tab is actually in the foreground.
@@ -303,7 +311,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <div className="brand">Hearth 🏡</div>
+        <div className="brand">🏡 Hearth</div>
         <nav className="tabs">
           <button className={tab === 'chat' ? 'active' : ''} onClick={() => setTab('chat')}>
             💬 Chat{unread > 0 ? ` (${unread})` : ''}
@@ -338,6 +346,8 @@ export default function App() {
             setMe={setMe}
             nickname={nickname}
             setNickname={setNickname}
+            theme={theme}
+            setTheme={setTheme}
             onLogout={handleLogout}
           />
         )}
