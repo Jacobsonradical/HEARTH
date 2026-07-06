@@ -1,0 +1,35 @@
+# One service, one container. `docker compose up -d --build` is all it takes.
+services:
+  hearth:
+    build: .
+    container_name: hearth
+    restart: unless-stopped
+
+    # Credentials and machine-specific settings come from .env (never committed).
+    env_file: .env
+
+    # In-container settings. These override the image defaults and point the app
+    # at the mounted data folder.
+    environment:
+      HEARTH_ADDR: ":3000"
+      HEARTH_DATA_DIR: "/data"
+      HEARTH_WEB_DIR: "/app/web"
+      TZ: "${TZ:-UTC}"
+
+    # Publish the port bound ONLY to the machine's LAN IP. This is the core of
+    # the "LAN-only" model: with HEARTH_BIND_IP set to your 192.168.x.x address,
+    # the app is reachable from other devices on the wifi but is never listening
+    # on a public interface. The safe default (127.0.0.1) exposes it to this
+    # machine only until you deliberately set your LAN IP in .env.
+    ports:
+      - "${HEARTH_BIND_IP:-127.0.0.1}:${HEARTH_PORT:-3000}:3000"
+
+    # Run as the host user so files written into ./data are owned by you (not
+    # root), which keeps backups and manual inspection painless. Override in .env
+    # if your account isn't uid/gid 1000 (check with: id -u ; id -g).
+    user: "${HEARTH_UID:-1000}:${HEARTH_GID:-1000}"
+
+    # The single data folder: messages (SQLite), uploads, garden state. Copying
+    # this folder is a full backup; a fresh container on it is a full restore.
+    volumes:
+      - ./data:/data

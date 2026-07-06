@@ -1,0 +1,17 @@
+# Notes and working files kept out of the public repo.
+claude/
+tmp/
+
+# Runtime data (messages, uploads, garden state) — never commit this.
+data/
+
+# Secrets live only in the local .env; only the example is tracked.
+.env
+
+# Frontend build output and dependencies.
+web/node_modules/
+web/dist/
+
+# Misc
+*.log
+.DS_Store

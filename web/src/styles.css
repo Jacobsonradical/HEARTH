@@ -1,0 +1,836 @@
+/* Hearth's look: soft pastels, rounded everything, gentle motion. The whole
+   palette lives in these variables so the mood is easy to tweak in one place. */
+:root {
+  --pink: #ffd9e6;
+  --pink-deep: #ff9fc0;
+  --peach: #ffe6d5;
+  --cream: #fff7f0;
+  --mint: #d8f3e3;
+  --lav: #e7ddff;
+  --sky: #d9ecff;
+  --ink: #5b4a52; /* soft brown-grey text, warmer than black */
+  --ink-soft: #9a8791;
+  --bubble-mine: #ffe0ec;
+  --bubble-theirs: #e6f0ff;
+  --shadow: 0 6px 18px rgba(180, 130, 150, 0.18);
+  --radius: 20px;
+  font-family: "Segoe UI", "Nunito", system-ui, -apple-system, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  color: var(--ink);
+  background: linear-gradient(160deg, var(--pink) 0%, var(--peach) 45%, var(--cream) 100%);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  border-radius: 999px;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.15s ease;
+}
+button:active { transform: scale(0.96); }
+button:disabled { opacity: 0.5; cursor: default; }
+
+input, textarea {
+  font-family: inherit;
+  font-size: 15px;
+  color: var(--ink);
+  border: 2px solid transparent;
+  background: #fff;
+  border-radius: 14px;
+  padding: 10px 12px;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+input:focus, textarea:focus { border-color: var(--pink-deep); }
+
+/* --- Splash + loading ---------------------------------------------------- */
+.splash {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  font-size: 64px;
+  animation: pulse 1.6s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 0.85; }
+  50% { transform: scale(1.12); opacity: 1; }
+}
+
+/* --- Login --------------------------------------------------------------- */
+.login-screen {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.login-card {
+  width: min(360px, 92vw);
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(8px);
+  border-radius: 28px;
+  padding: 32px 28px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: center;
+}
+.login-emoji { font-size: 44px; }
+.login-card h1 { margin: 0 0 6px; font-size: 26px; }
+.login-card label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+.login-card button[type="submit"] {
+  margin-top: 6px;
+  padding: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #7a3350;
+  background: linear-gradient(120deg, var(--pink-deep), var(--pink));
+  box-shadow: var(--shadow);
+}
+.login-error {
+  background: #ffe0e0;
+  color: #b3474b;
+  border-radius: 12px;
+  padding: 8px;
+  font-size: 13px;
+}
+
+/* --- First-open setup ------------------------------------------------------ */
+.setup-card { width: min(430px, 94vw); }
+.setup-sub { margin: -4px 0 4px; color: var(--ink-soft); font-size: 13px; }
+.setup-person {
+  background: rgba(255, 255, 255, 0.55);
+  border-radius: 16px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+}
+.setup-person-title { font-weight: 700; font-size: 14px; }
+
+/* --- The address card in Settings ------------------------------------------ */
+.address-code {
+  background: #fff;
+  border-radius: 8px;
+  padding: 6px 9px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.address-hint {
+  font-size: 12px;
+  color: var(--ink-soft);
+  line-height: 1.55;
+  text-align: left;
+  margin: 2px 2px 10px;
+}
+.address-hint code {
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 5px;
+  padding: 1px 5px;
+}
+
+/* --- App shell ----------------------------------------------------------- */
+.app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  max-width: 720px;
+  margin: 0 auto;
+}
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  gap: 10px;
+}
+.brand { font-weight: 800; font-size: 18px; }
+.tabs { display: flex; gap: 6px; }
+.tabs button {
+  background: rgba(255, 255, 255, 0.6);
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.tabs button.active {
+  background: #fff;
+  box-shadow: var(--shadow);
+  color: #b5567c;
+}
+
+.content {
+  flex: 1;
+  min-height: 0; /* let inner scroll areas work inside flexbox */
+  padding: 0 12px 12px;
+  display: flex;
+}
+
+/* --- Chat ---------------------------------------------------------------- */
+.chat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.55);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  min-height: 0;
+}
+.chat-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(6px);
+}
+.chat-header-name { font-weight: 700; display: flex; flex-direction: column; }
+.presence { font-size: 11px; font-weight: 600; }
+.presence.active { color: #4caf82; }   /* present */
+.presence.busy { color: #e5972a; }     /* on another tab/app */
+.presence.away { color: var(--ink-soft); }
+.presence.offline { color: #b7a9b0; }
+.presence.typing { color: #4caf82; }
+
+/* The "typing…" dots cycle .  ..  ... on a gentle loop. */
+.typing-dots::after {
+  content: '';
+  animation: typing-dots 1.2s steps(1, end) infinite;
+}
+@keyframes typing-dots {
+  0% { content: ''; }
+  25% { content: '.'; }
+  50% { content: '..'; }
+  75% { content: '...'; }
+  100% { content: ''; }
+}
+
+.avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+}
+.avatar-fallback {
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+}
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.empty-hint {
+  margin: auto;
+  color: var(--ink-soft);
+  font-size: 15px;
+}
+
+/* The "unread" line: a soft rule with a little centered label, marking where
+   the messages that arrived while you were away begin. */
+.unread-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 4px;
+  color: var(--pink-deep);
+  font-size: 12px;
+  font-weight: 700;
+}
+.unread-divider::before,
+.unread-divider::after {
+  content: '';
+  flex: 1;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--pink-deep), transparent);
+}
+.unread-divider span { white-space: nowrap; }
+/* The fade wipes from the middle out to the two sides: the label melts first,
+   then each half-line retracts toward its outer edge. */
+.unread-divider.fading span {
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+.unread-divider.fading::before {
+  transform: scaleX(0);
+  transform-origin: left;   /* collapse toward the left edge */
+  transition: transform 1.4s ease 0.4s;
+}
+.unread-divider.fading::after {
+  transform: scaleX(0);
+  transform-origin: right;  /* collapse toward the right edge */
+  transition: transform 1.4s ease 0.4s;
+}
+.msg-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: 82%;
+  animation: pop 0.18s ease;
+}
+@keyframes pop {
+  from { transform: translateY(6px) scale(0.98); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+.msg-row.mine { align-self: flex-end; flex-direction: row; }
+.msg-row.theirs { align-self: flex-start; }
+.bubble {
+  padding: 9px 13px;
+  border-radius: 18px;
+  background: var(--bubble-theirs);
+  box-shadow: 0 2px 6px rgba(150,150,180,0.12);
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+.msg-row.mine .bubble {
+  background: var(--bubble-mine);
+  border-bottom-right-radius: 6px;
+}
+.msg-row.theirs .bubble { border-bottom-left-radius: 6px; }
+.msg-image {
+  max-width: 220px;
+  border-radius: 12px;
+  display: block;
+  margin-bottom: 4px;
+}
+.msg-time {
+  font-size: 10px;
+  color: var(--ink-soft);
+  text-align: right;
+  margin-top: 3px;
+}
+
+.composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.7);
+}
+.composer-input {
+  flex: 1;
+  resize: none;
+  max-height: 120px;
+  border-radius: 18px;
+}
+.icon-btn {
+  background: #fff;
+  width: 42px;
+  height: 42px;
+  font-size: 18px;
+  box-shadow: var(--shadow);
+}
+.send-btn {
+  background: linear-gradient(120deg, var(--pink-deep), var(--pink));
+  color: #7a3350;
+  font-weight: 700;
+  padding: 10px 16px;
+  box-shadow: var(--shadow);
+}
+
+/* --- Garden -------------------------------------------------------------- */
+.garden {
+  flex: 1;
+  position: relative;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.garden.loading { display: grid; place-items: center; color: var(--ink-soft); }
+
+/* ---- Sky: colored by the time of day, tinted by the weather ---- */
+.sky {
+  position: absolute;
+  inset: 0;
+  transition: background 2s ease;
+}
+.phase-day .sky   { background: linear-gradient(180deg, #9edbff 0%, #cdeeff 55%, #e9f8ff 100%); }
+.phase-dawn .sky  { background: linear-gradient(180deg, #9db8e8 0%, #ffc9a3 55%, #ffe6c4 100%); }
+.phase-dusk .sky  { background: linear-gradient(180deg, #6d6fa8 0%, #ff9e7d 60%, #ffc48f 100%); }
+.phase-night .sky { background: linear-gradient(180deg, #17203d 0%, #2b3a63 60%, #3d4d79 100%); }
+/* Heavier weather greys the sky down a little. */
+.sky::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(96, 106, 122, 0);
+  transition: background 2s ease;
+  pointer-events: none;
+}
+.w-cloudy .sky::after { background: rgba(96, 106, 122, 0.12); }
+.w-fog .sky::after    { background: rgba(150, 158, 166, 0.3); }
+.w-snow .sky::after   { background: rgba(198, 208, 218, 0.28); }
+.w-rain .sky::after   { background: rgba(80, 92, 110, 0.3); }
+.w-storm .sky::after  { background: rgba(52, 60, 76, 0.42); }
+
+/* ---- Sun and moon, travelling their arcs ---- */
+.sun, .moon {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  transition: left 60s linear, top 60s linear, opacity 2s ease;
+}
+/* Heavy weather hides the sun and moon behind the clouds. */
+.w-cloudy .sun, .w-cloudy .moon, .w-snow .sun, .w-snow .moon { opacity: 0.55; }
+.w-rain .sun, .w-rain .moon, .w-fog .sun, .w-fog .moon { opacity: 0.12; }
+.w-storm .sun, .w-storm .moon { opacity: 0; }
+.sun {
+  width: 56px;
+  height: 56px;
+  background: radial-gradient(circle at 38% 35%, #fff9d8, #ffd75e 70%);
+  box-shadow: 0 0 42px 14px rgba(255, 214, 90, 0.55);
+  cursor: pointer;
+}
+/* Saying hello to the sun: it beams brighter, does a happy wiggle, and peeks
+   out in front of any cloud that happens to be passing. */
+.sun.happy {
+  animation: sun-joy 0.7s ease;
+  box-shadow: 0 0 56px 22px rgba(255, 214, 90, 0.75);
+  z-index: 2;
+}
+@keyframes sun-joy {
+  0%   { rotate: 0deg; scale: 1; }
+  30%  { rotate: -10deg; scale: 1.12; }
+  60%  { rotate: 9deg; scale: 1.06; }
+  100% { rotate: 0deg; scale: 1; }
+}
+.sun-face {
+  position: absolute;
+  inset: 0;
+  animation: face-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes face-pop {
+  from { opacity: 0; scale: 0.5; }
+  to   { opacity: 1; scale: 1; }
+}
+.moon { cursor: pointer; }
+.moon {
+  width: 46px;
+  height: 46px;
+  background:
+    radial-gradient(circle at 30% 30%, rgba(0,0,0,0.06) 5px, transparent 6px),
+    radial-gradient(circle at 62% 55%, rgba(0,0,0,0.06) 4px, transparent 5px),
+    radial-gradient(circle at 42% 70%, rgba(0,0,0,0.05) 3px, transparent 4px),
+    radial-gradient(circle at 40% 38%, #fbf8e6, #e8e2c4 75%);
+  box-shadow: 0 0 30px 8px rgba(240, 234, 190, 0.35);
+}
+.star {
+  position: absolute;
+  background: #fff;
+  border-radius: 50%;
+  opacity: 0.8;
+  animation: twinkle 2.6s ease-in-out infinite;
+}
+@keyframes twinkle {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 0.95; }
+}
+
+/* ---- Clouds: an outer drifter carrying a squishable puff ---- */
+.cloud {
+  position: absolute;
+  left: -180px;
+  width: 120px;
+  height: 36px;
+  animation-name: cloud-drift;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+.cloud-puff {
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 999px;
+  cursor: pointer;
+  transform-origin: 50% 70%;
+}
+.cloud-puff::before, .cloud-puff::after {
+  content: '';
+  position: absolute;
+  background: inherit;
+  border-radius: 50%;
+}
+.cloud-puff::before { width: 52px; height: 52px; left: 16px; top: -24px; }
+.cloud-puff::after  { width: 38px; height: 38px; right: 20px; top: -16px; }
+.cloud-dark .cloud-puff { background: rgba(214, 219, 228, 0.95); }
+.phase-night .cloud-puff { background: rgba(150, 160, 185, 0.5); }
+@keyframes cloud-drift {
+  from { left: -180px; }
+  to   { left: 105%; }
+}
+/* Squished! A marshmallow wobble: squash wide, stretch tall, settle. */
+.cloud-puff.squish {
+  animation: cloud-squish 0.7s cubic-bezier(0.28, 0.84, 0.42, 1);
+}
+@keyframes cloud-squish {
+  0%   { transform: scale(1, 1); }
+  22%  { transform: scale(1.28, 0.68); }
+  45%  { transform: scale(0.82, 1.22); }
+  65%  { transform: scale(1.12, 0.9); }
+  82%  { transform: scale(0.96, 1.05); }
+  100% { transform: scale(1, 1); }
+}
+/* The cloud that keeps the sun company in grey weather: it hovers in place
+   (no drift) and bobs gently instead. */
+.cloud.sun-hugger {
+  animation: sun-hugger-bob 7s ease-in-out infinite alternate;
+  transform: translate(-50%, -50%) scale(0.72);
+}
+@keyframes sun-hugger-bob {
+  from { margin-top: 0; }
+  to   { margin-top: 10px; }
+}
+
+/* ---- Weather effects ---- */
+.rain { position: absolute; inset: 0; pointer-events: none; }
+.raindrop {
+  position: absolute;
+  top: -8%;
+  width: 2.5px;
+  height: 17px;
+  border-radius: 2px;
+  background: rgba(150, 182, 228, 0.9);
+  animation: rain-fall 0.9s linear infinite;
+}
+@keyframes rain-fall {
+  to { transform: translateY(75vh); }
+}
+.phase-night .raindrop { background: rgba(196, 214, 244, 0.95); }
+.snow { position: absolute; inset: 0; pointer-events: none; }
+.snowflake {
+  position: absolute;
+  top: -6%;
+  color: #fff;
+  font-size: 12px;
+  opacity: 0.9;
+  animation: snow-fall 7s linear infinite;
+}
+@keyframes snow-fall {
+  0%   { transform: translateY(0) translateX(0); }
+  50%  { transform: translateY(35vh) translateX(14px); }
+  100% { transform: translateY(72vh) translateX(-8px); }
+}
+.lightning {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  opacity: 0;
+  pointer-events: none;
+  animation: flash 8s infinite;
+}
+@keyframes flash {
+  0%, 86%, 90%, 100% { opacity: 0; }
+  87%, 89% { opacity: 0.45; }
+  88% { opacity: 0.1; }
+}
+.fog {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg,
+    rgba(226, 230, 233, 0.15) 0%,
+    rgba(226, 230, 233, 0.55) 45%,
+    rgba(226, 230, 233, 0.25) 100%);
+}
+
+/* ---- Bees: they wander in, sometimes circle a flower, then buzz off ----
+   Each bee's journey legs are CSS transitions on left/top (set inline); the
+   orbiter spins it around a flower while it feeds, and the bee itself bobs. */
+.bee-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4; /* above the plants, below the panel */
+}
+.bee-fly { position: absolute; transform: translate(-50%, -50%); }
+.bee-orbiter { display: inline-block; }
+.bee-orbiter.orbit {
+  animation: bee-orbit 1.7s ease-in-out infinite;
+}
+/* Circling the blossom it landed on. */
+@keyframes bee-orbit {
+  0%   { transform: translate(0, 0); }
+  25%  { transform: translate(11px, -8px); }
+  50%  { transform: translate(0, -14px); }
+  75%  { transform: translate(-11px, -6px); }
+  100% { transform: translate(0, 0); }
+}
+.bee {
+  display: inline-block;
+  font-size: 20px;
+  animation: bee-bob 0.7s ease-in-out infinite alternate;
+  pointer-events: auto; /* the layer ignores clicks, but the bee itself is pettable */
+  cursor: pointer;
+}
+/* While circling, the orbit is motion enough — pause the bobbing. */
+.bee-orbiter.orbit .bee { animation: none; }
+@keyframes bee-bob {
+  from { translate: 0 -7px; }
+  to   { translate: 0 7px; }
+}
+/* Thank-you hearts: each pops in with a bounce, then drifts up and away with
+   its own sideways sway (--dx) and tilt (--rot). */
+.heart-pop {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  opacity: 0;
+  animation: heart-rise 1.7s cubic-bezier(0.22, 0.9, 0.35, 1) forwards;
+}
+@keyframes heart-rise {
+  0%   { opacity: 0; translate: 0 4px; scale: 0.2; rotate: 0deg; }
+  14%  { opacity: 1; scale: 1.25; }                 /* bouncy pop */
+  26%  { scale: 0.95; }
+  38%  { scale: 1.05; }
+  70%  { opacity: 0.95; }
+  100% { opacity: 0; translate: var(--dx, 0px) -62px; scale: 1; rotate: var(--rot, 0deg); }
+}
+
+/* ---- The little weather card, top corner, frosted like a phone widget ---- */
+.weather-card {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 4;
+  padding: 8px 13px 9px;
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(10px);
+  color: #445064;
+  text-align: left;
+  box-shadow: 0 3px 14px rgba(100, 110, 140, 0.12);
+}
+.weather-place {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  opacity: 0.8;
+}
+.weather-temp {
+  font-size: 24px;
+  font-weight: 300;
+  line-height: 1.15;
+}
+.weather-f {
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.65;
+  margin-left: 6px;
+}
+.weather-desc { font-size: 11.5px; font-weight: 600; }
+/* Readable over the night sky too. */
+.phase-night .weather-card {
+  background: rgba(36, 46, 78, 0.5);
+  color: #e8ecf8;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.25);
+}
+
+/* ---- The living ground: hill, tree, flowers ---- */
+.garden-scene {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+  pointer-events: none; /* clicks pass through to the sun and clouds behind */
+}
+/* Night falls over the plants too. */
+.phase-night .garden-scene { filter: brightness(0.58) saturate(0.8); }
+.phase-dusk .garden-scene  { filter: brightness(0.88); }
+.phase-dawn .garden-scene  { filter: brightness(0.94); }
+
+.hill {
+  position: absolute;
+  bottom: 0;
+  left: -6%;
+  width: 112%;
+  height: 64px;
+  background: linear-gradient(180deg, #b5dfa4 0%, #8cc47a 70%);
+  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+}
+.w-snow .hill { background: linear-gradient(180deg, #f2f7f9 0%, #d7e6ea 70%); }
+
+.tree-wrap {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(48%, 230px);
+  z-index: 2;
+}
+.tree-svg {
+  width: 100%;
+  display: block;
+  transform-origin: bottom center;
+  animation: tree-sway 5s ease-in-out infinite;
+}
+@keyframes tree-sway {
+  0%, 100% { transform: rotate(-1.2deg); }
+  50% { transform: rotate(1.2deg); }
+}
+
+.flower-row { position: absolute; bottom: 26px; left: 0; right: 0; z-index: 1; }
+.flower-row.front { bottom: 14px; z-index: 3; }
+.flower-spot { position: absolute; bottom: 0; transform: translateX(-50%); }
+.flower-svg {
+  display: block;
+  transform-origin: bottom center;
+  animation: flower-sway 3.6s ease-in-out infinite alternate;
+}
+@keyframes flower-sway {
+  from { transform: rotate(-2.5deg); }
+  to   { transform: rotate(2.5deg); }
+}
+
+/* Falling water drops, shown briefly over the scene while watering. */
+.water-drops {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+.drop {
+  position: absolute;
+  top: 8%;
+  font-size: 20px;
+  opacity: 0;
+  animation: drip 1.1s ease-in forwards;
+}
+@keyframes drip {
+  0% { transform: translateY(-20px); opacity: 0; }
+  25% { opacity: 1; }
+  100% { transform: translateY(150px); opacity: 0; }
+}
+
+/* ---- The info panel below the scene ---- */
+.garden-panel {
+  position: relative;
+  z-index: 5;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(6px);
+  padding: 14px 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: center;
+}
+.garden-stage-name {
+  font-weight: 800;
+  text-transform: capitalize;
+  color: #7a9a5a;
+}
+.growth-bar {
+  height: 10px;
+  background: #eee;
+  border-radius: 999px;
+  overflow: hidden;
+}
+.growth-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #a7e0a1, #6fc16a);
+  transition: width 0.5s ease;
+}
+.garden-stats {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  font-weight: 700;
+}
+.garden-actions { display: flex; gap: 10px; justify-content: center; }
+.garden-btn {
+  background: #fff;
+  padding: 11px 16px;
+  font-weight: 700;
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+
+/* --- Settings ------------------------------------------------------------ */
+.settings {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 4px 20px;
+}
+.settings h2 { text-align: center; }
+.setting-card {
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 8px 16px;
+  margin-bottom: 14px;
+}
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px dashed rgba(0,0,0,0.06);
+}
+.setting-row:last-child { border-bottom: none; }
+.setting-label { display: flex; flex-direction: column; font-weight: 600; }
+.setting-label small { font-weight: 400; color: var(--ink-soft); font-size: 11px; }
+.setting-control { display: flex; align-items: center; gap: 8px; }
+.setting-control input { width: 160px; }
+.ghost-btn {
+  background: var(--lav);
+  padding: 8px 12px;
+  font-weight: 600;
+  color: #6a5aa0;
+}
+.bg-preview {
+  width: 54px;
+  height: 36px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+.muted { color: var(--ink-soft); font-size: 13px; }
+
+.settings-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+.saved-flash { color: #4caf82; font-weight: 600; }
+.logout-btn {
+  background: #ffe0e0;
+  color: #b3474b;
+  font-weight: 700;
+  padding: 10px 20px;
+}
+
+/* On phones, let the app fill the screen and keep tap targets comfy. */
+@media (max-width: 520px) {
+  .setting-control input { width: 120px; }
+  .tabs button { padding: 8px 10px; }
+}

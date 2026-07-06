@@ -1,0 +1,8 @@
+# Keep the build context small and never ship data, secrets, or notes.
+claude/
+tmp/
+data/
+.env
+.git/
+web/node_modules/
+web/dist/
