@@ -98,6 +98,11 @@ if [ ! -f "$ENV_FILE" ]; then
   echo "Created .env from .env.example"
 fi
 
+# Create the data folder as the real user BEFORE Docker ever runs. If Docker
+# creates it for the bind mount instead, it belongs to root and the app (which
+# runs as your user) cannot write to it and dies on startup.
+mkdir -p "$SCRIPT_DIR/data"
+
 IP="${1:-${HEARTH_BIND_IP:-$(detect_ip)}}"
 TZ_VALUE="$(detect_tz)"
 UID_VALUE="$(id -u)"
