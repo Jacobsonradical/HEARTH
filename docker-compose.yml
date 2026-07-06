@@ -14,7 +14,8 @@ services:
       HEARTH_ADDR: ":3000"
       HEARTH_DATA_DIR: "/data"
       HEARTH_WEB_DIR: "/app/web"
-      TZ: "${TZ:-UTC}"
+      # Empty TZ means the app auto-detects the timezone from the internet.
+      TZ: "${TZ:-}"
 
     # Publish the port bound ONLY to the machine's LAN IP. This is the core of
     # the "LAN-only" model: with HEARTH_BIND_IP set to your 192.168.x.x address,

@@ -44,6 +44,59 @@ func newWeatherService(lat, lon, place string) *weatherService {
 	return &weatherService{lat: lat, lon: lon, place: place}
 }
 
+// ipLocation is what the server can learn about itself from its public IP:
+// where it roughly is, and which timezone that is in.
+type ipLocation struct {
+	Lat, Lon float64
+	City     string
+	Timezone string
+}
+
+// fetchIPLocation asks ipwho.is (free, no key) where this connection is.
+func fetchIPLocation(timeout time.Duration) (*ipLocation, error) {
+	client := &http.Client{Timeout: timeout}
+	resp, err := client.Get("https://ipwho.is/")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	var raw struct {
+		Success   bool    `json:"success"`
+		Latitude  float64 `json:"latitude"`
+		Longitude float64 `json:"longitude"`
+		City      string  `json:"city"`
+		Timezone  struct {
+			ID string `json:"id"`
+		} `json:"timezone"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return nil, err
+	}
+	if !raw.Success {
+		return nil, fmt.Errorf("ip lookup refused")
+	}
+	return &ipLocation{
+		Lat: raw.Latitude, Lon: raw.Longitude,
+		City: raw.City, Timezone: raw.Timezone.ID,
+	}, nil
+}
+
+// AutoTimezone guesses the local timezone from the internet connection. Used
+// at startup when no TZ was configured, so daily streaks and the garden's
+// day/night cycle follow the real local day. Returns nil when offline or
+// unsure — the caller then stays on UTC.
+func AutoTimezone() *time.Location {
+	info, err := fetchIPLocation(4 * time.Second)
+	if err != nil || info.Timezone == "" {
+		return nil
+	}
+	loc, err := time.LoadLocation(info.Timezone)
+	if err != nil {
+		return nil
+	}
+	return loc
+}
+
 // autoLocate fills in lat/lon (and the place name) from the server's public
 // IP when no coordinates were configured. City-level accuracy — plenty for a
 // weather mood. Runs at most once an hour until it succeeds; a VPN on the host
@@ -57,29 +110,17 @@ func (ws *weatherService) autoLocate() bool {
 	}
 	ws.autoTried = time.Now()
 
-	client := &http.Client{Timeout: 8 * time.Second}
-	resp, err := client.Get("https://ipwho.is/")
+	info, err := fetchIPLocation(8 * time.Second)
 	if err != nil {
 		log.Printf("weather: auto-locate failed: %v", err)
 		return false
 	}
-	defer resp.Body.Close()
-	var raw struct {
-		Success   bool    `json:"success"`
-		Latitude  float64 `json:"latitude"`
-		Longitude float64 `json:"longitude"`
-		City      string  `json:"city"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil || !raw.Success {
-		log.Printf("weather: auto-locate got no usable answer")
-		return false
-	}
-	ws.lat = fmt.Sprintf("%.4f", raw.Latitude)
-	ws.lon = fmt.Sprintf("%.4f", raw.Longitude)
+	ws.lat = fmt.Sprintf("%.4f", info.Lat)
+	ws.lon = fmt.Sprintf("%.4f", info.Lon)
 	if ws.place == "" {
-		ws.place = raw.City
+		ws.place = info.City
 	}
-	log.Printf("weather: auto-located to %s", raw.City)
+	log.Printf("weather: auto-located to %s", info.City)
 	return true
 }
 

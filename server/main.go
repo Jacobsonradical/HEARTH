@@ -62,6 +62,19 @@ func main() {
 
 	cfg := loadConfig()
 
+	// No timezone configured? Find it from the internet connection, so streaks
+	// and the garden's day/night cycle follow the real local day even on hosts
+	// that never set TZ (e.g. a default Windows/WSL install). Offline at boot
+	// simply means UTC until the next restart — nothing breaks.
+	if os.Getenv("TZ") == "" {
+		if loc := api.AutoTimezone(); loc != nil {
+			time.Local = loc
+			log.Printf("timezone auto-detected: %s (set TZ in .env to override)", loc)
+		} else {
+			log.Printf("timezone: could not auto-detect, using UTC (set TZ in .env)")
+		}
+	}
+
 	// Make sure the data folder and its uploads subfolder exist. This folder is
 	// the single source of truth for backup/restore.
 	uploadDir := filepath.Join(cfg.dataDir, "uploads")

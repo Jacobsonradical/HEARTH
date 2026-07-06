@@ -31,29 +31,64 @@ No database server to install. No Node or Go needed on the host. Just Docker.
 
 ## Requirements
 
-- A Linux machine (your Ubuntu home server) with:
-  - **Docker** and the **Docker Compose plugin**
-    (`docker --version` and `docker compose version` should both work).
-- That's it. **You do NOT need to install SQLite, PostgreSQL, Go, or Node** —
-  everything is built and run inside the container.
+One always-on computer at home (the "host") with **Docker**:
+
+| Host OS | What to install |
+|---|---|
+| **Linux** | [Docker Engine](https://docs.docker.com/engine/install/) + compose plugin |
+| **macOS** (Apple Silicon *and* Intel) | [Docker Desktop for Mac](https://docs.docker.com/desktop/setup/install/mac-install/) |
+| **Windows** | [Docker Desktop for Windows](https://docs.docker.com/desktop/setup/install/windows-install/) with the **WSL2** backend |
+
+That's it. **You do NOT need to install SQLite, PostgreSQL, Go, or Node** —
+everything is built and run inside the container. The image builds natively on
+your machine's own architecture (arm64 or x86-64), so Apple Silicon needs no
+special steps.
 
 ---
 
-## Setup (first time)
+## Install (one line)
 
-From the project folder:
+**Linux and macOS** — open a terminal:
 
 ```bash
-# 1. Auto-configure the machine-specific settings (LAN IP, timezone, user).
-#    This creates .env from the template and fills those in for you.
+curl -fsSL https://raw.githubusercontent.com/Jacobsonradical/HEARTH/master/install.sh | sh
+```
+
+**Windows** — open your **WSL terminal** (e.g. Ubuntu; Docker Desktop requires
+WSL2 anyway) and run the same line. Running inside WSL is deliberate: the
+database lives on WSL's Linux filesystem, where SQLite is fully safe —
+Windows-mounted folders are not reliable for it.
+
+The installer checks Docker, downloads the app into `~/hearth`, detects your
+LAN IP and timezone, builds, and starts it. At the end it prints your address:
+
+```
+hearth | HEARTH is up!  Open:   http://192.168.1.50:3000
+```
+
+Open that from any device on your wifi — the app greets you with a **one-time
+setup screen** where you create the two accounts, yours and your love's. Done.
+
+Re-running the installer later **updates** an existing `~/hearth` install.
+Options: `HEARTH_DIR=/elsewhere`, `HEARTH_BIND_IP=...`, `HEARTH_PORT=...` before
+the command.
+
+## Setup by hand (alternative)
+
+If you'd rather not pipe scripts into your shell — sensible! — do the same
+steps yourself:
+
+```bash
+git clone https://github.com/Jacobsonradical/HEARTH.git ~/hearth
+cd ~/hearth
+
+# 1. Auto-configure machine-specific settings (LAN IP, timezone, user) into .env
 ./setup.sh
 
-# 2. Start it.
+# 2. Build and start
 docker compose up -d --build
 
-# 3. Open the address setup.sh printed (e.g. http://192.168.1.50:3000).
-#    The app greets you with a one-time setup screen where you create the two
-#    accounts — yours and your love's. That's it.
+# 3. Open the printed address and create the two accounts in the app.
 ```
 
 The first build takes a couple of minutes. After that it starts instantly.
@@ -66,8 +101,12 @@ The first build takes a couple of minutes. After that it starts instantly.
   reach it. If auto-detect guesses wrong (e.g. you have a VPN or several
   interfaces), pass the right one explicitly: `./setup.sh 192.168.1.50`.
   To find it yourself: `hostname -I`.
-- `TZ` — your system timezone, so daily streaks and seasons match your real day.
+- `TZ` — your system timezone, so daily streaks and seasons match your real
+  day. If it can't be detected here, the app detects it itself from your
+  internet connection at startup.
 - `HEARTH_UID` / `HEARTH_GID` — your user, so files in `./data` stay owned by you.
+- On **WSL** it asks Windows for the real LAN IP automatically (PowerShell
+  interop); on **macOS** it queries the network services directly.
 
 Accounts are **not** set in `.env` — the app asks you on first open. (The
 `HEARTH_USER*/PASS*` variables exist only as an override, e.g. to reset a
@@ -114,6 +153,7 @@ time — even after closing the browser.
 ## Backup & restore
 
 **Everything lives in `./data`.** That one folder is the whole app state.
+(On Windows that's inside WSL, e.g. `~/hearth/data` in your Ubuntu distro.)
 
 **Backup** — copy the folder, or use the included script:
 

@@ -39,8 +39,8 @@ ARCHIVE="$BACKUP_DIR/hearth-$STAMP.tar.gz"
 tar -czf "$ARCHIVE" -C "$PROJECT_DIR" data
 echo "backup: wrote $ARCHIVE"
 
-# Prune old archives, keeping the newest $KEEP.
-mapfile -t OLD < <(ls -1t "$BACKUP_DIR"/hearth-*.tar.gz 2>/dev/null | tail -n +"$((KEEP + 1))")
-for f in "${OLD[@]:-}"; do
-  [[ -n "$f" ]] && rm -f "$f" && echo "backup: pruned $f"
+# Prune old archives, keeping the newest $KEEP. (Plain loop: macOS ships an
+# old bash without mapfile.)
+ls -1t "$BACKUP_DIR"/hearth-*.tar.gz 2>/dev/null | tail -n +"$((KEEP + 1))" | while read -r f; do
+  [ -n "$f" ] && rm -f "$f" && echo "backup: pruned $f"
 done
