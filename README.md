@@ -1,5 +1,7 @@
 # 🏡 Hearth
 
+![build](https://github.com/Jacobsonradical/HEARTH/actions/workflows/build.yml/badge.svg)
+
 A tiny, cozy chat app just for two people, self-hosted on your own machine. It
 runs as a single Docker container on your home server and you open it from any
 browser on your home wifi — no accounts to sign up for, nothing installed on the
@@ -147,6 +149,30 @@ time — even after closing the browser.
   seasons. When you both say good morning on the same day, you get a bonus.
 - **Me** ⚙️ — set your display name, a private nickname for your partner, your
   photo, your notification sound, and your chat background.
+
+---
+
+## Updating
+
+When new features land in this repository, update your install with either:
+
+```bash
+# the same one-liner — it detects the existing install and updates it in place
+curl -fsSL https://raw.githubusercontent.com/Jacobsonradical/HEARTH/master/install.sh | sh
+```
+
+or by hand:
+
+```bash
+cd ~/hearth
+git pull
+docker compose up -d --build
+```
+
+**Your data is never touched by an update** — messages, photos, garden, and
+logins all live in `./data`, which git and Docker builds leave alone. You stay
+logged in, the app is only briefly restarted. (Old image layers pile up after
+many rebuilds; reclaim disk now and then with `docker image prune -f`.)
 
 ---
 

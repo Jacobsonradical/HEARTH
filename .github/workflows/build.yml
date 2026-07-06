@@ -1,0 +1,36 @@
+# Build the Docker image and boot it once on every push, so a bad commit can
+# never silently break `docker compose up` for a fresh install.
+name: build
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the image
+        run: docker build -t hearth:ci .
+
+      - name: Boot and smoke-test
+        run: |
+          mkdir -p data
+          docker run -d --name hearth -p 3000:3000 -v "$PWD/data:/data" hearth:ci
+
+          # Wait for the server, then confirm a fresh install asks for setup.
+          for i in $(seq 1 30); do
+            curl -fs http://localhost:3000/api/setup-status && break
+            sleep 1
+          done
+          curl -fs http://localhost:3000/api/setup-status | grep -q '"needsSetup":true'
+
+          # The frontend shell must be served too.
+          curl -fs http://localhost:3000/ | grep -qi '<div id="root">'
+
+      - name: Show logs (for debugging failures)
+        if: always()
+        run: docker logs hearth || true
