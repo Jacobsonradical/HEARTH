@@ -162,10 +162,11 @@ time — even after closing the browser.
 KEEP=30 BACKUP_DIR=/mnt/usb ./scripts/backup.sh
 ```
 
-Cron example (nightly at 02:30):
+Automatic nightly backup at 02:30 — run `crontab -e` and add (adjust the path
+to your install; `echo $HOME` tells you what ~ is):
 
 ```cron
-30 2 * * * /media/rabbitlord/ssd2/github-project/HEARTH/scripts/backup.sh >> /var/log/hearth-backup.log 2>&1
+30 2 * * * $HOME/hearth/scripts/backup.sh >> $HOME/hearth/backup.log 2>&1
 ```
 
 **Restore** — put the folder back and start the container:
