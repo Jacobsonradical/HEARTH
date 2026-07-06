@@ -303,7 +303,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <div className="brand">🏡 Hearth</div>
+        <div className="brand">Hearth 🏡</div>
         <nav className="tabs">
           <button className={tab === 'chat' ? 'active' : ''} onClick={() => setTab('chat')}>
             💬 Chat{unread > 0 ? ` (${unread})` : ''}
