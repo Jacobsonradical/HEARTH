@@ -650,13 +650,12 @@ func (s *Store) RecordGamePlay(userID int64, score int) error {
 	return err
 }
 
-// RecentGamePlays returns the newest plays (who, when, score), most recent
-// first. The display name is resolved by joining users.
+// RecentGamePlays returns the newest plays (who, score, when), most recent
+// first. The player's display label is resolved by the caller (it's the pet
+// name the partner set), so this only returns the user id.
 func (s *Store) RecentGamePlays(limit int) ([]GamePlay, error) {
 	rows, err := s.db.Query(
-		`SELECT COALESCE(u.display_name, '—'), p.score, p.created_at
-		 FROM game_plays p LEFT JOIN users u ON u.id = p.user_id
-		 ORDER BY p.id DESC LIMIT ?`, limit)
+		`SELECT user_id, score, created_at FROM game_plays ORDER BY id DESC LIMIT ?`, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -664,7 +663,7 @@ func (s *Store) RecentGamePlays(limit int) ([]GamePlay, error) {
 	var out []GamePlay
 	for rows.Next() {
 		var p GamePlay
-		if err := rows.Scan(&p.Name, &p.Score, &p.At); err != nil {
+		if err := rows.Scan(&p.UserID, &p.Score, &p.At); err != nil {
 			return nil, err
 		}
 		out = append(out, p)

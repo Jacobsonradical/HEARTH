@@ -166,7 +166,11 @@ export default function App() {
         if (fromPartner) {
           setPartnerTyping(false) // they sent it, so they've stopped typing
         }
-        const looking = tabRef.current === 'chat' && !document.hidden
+        // I only count as "looking" if the chat is open, in the foreground, AND
+        // I've been active recently. If I've gone idle (away) — even sitting on
+        // the chat tab — a new message still buzzes, so I don't miss it.
+        const idle = Date.now() - lastActivityRef.current > 5 * 60 * 1000
+        const looking = tabRef.current === 'chat' && !document.hidden && !idle
         if (fromPartner && !looking) {
           playNotif()
           setUnread((n) => n + 1)

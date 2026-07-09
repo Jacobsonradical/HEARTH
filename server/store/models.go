@@ -42,11 +42,13 @@ type Sticker struct {
 }
 
 // GamePlay is one finished game in the recent-plays feed: who played, their
-// score, and when (unix milliseconds).
+// score, and when (unix milliseconds). Name is filled by the API layer (it's
+// the pet name the partner gave the player), so it's not read from the DB here.
 type GamePlay struct {
-	Name  string `json:"name"`
-	Score int    `json:"score"`
-	At    int64  `json:"at"`
+	UserID int64  `json:"-"`
+	Name   string `json:"name"`
+	Score  int    `json:"score"`
+	At     int64  `json:"at"`
 }
 
 // GardenRow is the raw persisted garden state (single row). The higher level

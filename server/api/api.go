@@ -406,18 +406,56 @@ type gameHigh struct {
 	Plays       []store.GamePlay `json:"plays"`
 }
 
-// loadGameHigh reads the current best (with the holder's display name) plus the
-// five most recent plays.
+// coupleLabeler builds a function that names a player the way the game should
+// show them: the pet name their partner set for them, falling back to their own
+// display name. In this two-person app "the other account" is always the
+// partner, so a player is labelled with whatever their partner privately calls
+// them — a cute touch on the leaderboard.
+func (s *Server) coupleLabeler() (func(int64) string, error) {
+	users, err := s.st.AllUsers()
+	if err != nil {
+		return nil, err
+	}
+	display := make(map[int64]string, len(users))
+	partner := make(map[int64]int64, len(users))
+	for _, u := range users {
+		display[u.ID] = u.DisplayName
+	}
+	for _, a := range users {
+		for _, other := range users {
+			if other.ID != a.ID {
+				partner[a.ID] = other.ID
+				break
+			}
+		}
+	}
+	return func(id int64) string {
+		if p, ok := partner[id]; ok {
+			if nick, _ := s.st.Nickname(p, id); nick != "" {
+				return nick
+			}
+		}
+		if d := display[id]; d != "" {
+			return d
+		}
+		return "—"
+	}, nil
+}
+
+// loadGameHigh reads the current best (with the holder's couple name) plus the
+// five most recent plays, each labelled the same way.
 func (s *Server) loadGameHigh() (gameHigh, error) {
 	score, holderID, err := s.st.GameHigh()
 	if err != nil {
 		return gameHigh{}, err
 	}
+	label, err := s.coupleLabeler()
+	if err != nil {
+		return gameHigh{}, err
+	}
 	g := gameHigh{Score: score, HolderID: holderID}
 	if holderID > 0 {
-		if u, err := s.st.UserByID(holderID); err == nil {
-			g.HolderName = u.DisplayName
-		}
+		g.HolderName = label(holderID)
 	}
 	plays, err := s.st.RecentGamePlays(5)
 	if err != nil {
@@ -425,6 +463,9 @@ func (s *Server) loadGameHigh() (gameHigh, error) {
 	}
 	if plays == nil {
 		plays = []store.GamePlay{}
+	}
+	for i := range plays {
+		plays[i].Name = label(plays[i].UserID)
 	}
 	g.Plays = plays
 	return g, nil
