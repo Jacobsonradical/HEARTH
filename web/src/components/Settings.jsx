@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { apiPost, apiUpload } from '../api.js'
 
 // The notification volume is a per-device choice, so it lives in localStorage.
@@ -72,6 +72,8 @@ export default function Settings({
   setNickname,
   notifSounds,
   setNotifSounds,
+  stickers,
+  setStickers,
   theme,
   setTheme,
   onLogout,
@@ -80,8 +82,12 @@ export default function Settings({
   const [nick, setNick] = useState(nickname)
   const [saved, setSaved] = useState('')
   const [addingSound, setAddingSound] = useState(false)
+  const [addingSticker, setAddingSticker] = useState(false)
+  const [focusStickerId, setFocusStickerId] = useState(null) // name to focus after adding
+  const [stickerFilter, setStickerFilter] = useState('') // search box in the manager
   const [volume, setVolume] = useState(loadVolume)
   const soundFileRef = useRef(null)
+  const stickerFileRef = useRef(null)
   // Keep a single preview player so dragging the slider doesn't stack sounds.
   const previewRef = useRef(null)
   const previewAtRef = useRef(0)
@@ -90,6 +96,15 @@ export default function Settings({
     setSaved(msg)
     setTimeout(() => setSaved(''), 1500)
   }
+
+  // Right after a sticker is added, drop the cursor into its (empty) name box
+  // so naming it is the obvious next step. Runs once the new row is in the DOM.
+  useEffect(() => {
+    if (focusStickerId == null) return
+    const el = document.querySelector(`.sticker-mgr-name[data-id="${focusStickerId}"]`)
+    if (el) el.focus()
+    setFocusStickerId(null)
+  }, [focusStickerId, stickers])
 
   async function saveName() {
     const res = await apiPost('/api/profile', { displayName: name.trim() })
@@ -136,6 +151,50 @@ export default function Settings({
     }
   }
 
+  // --- Sticker manager (add / name / delete) --------------------------------
+  // Adding a sticker just needs the picture; right after, its name field is
+  // focused so you can name it (used for type-to-search in chat).
+  async function onPickSticker(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setAddingSticker(true)
+    try {
+      const { sticker } = await apiUpload('/api/upload/sticker', file, { name: '' })
+      setStickers((prev) => [sticker, ...prev])
+      setStickerFilter('') // clear any search so the new one is visible
+      setFocusStickerId(sticker.id) // jump the cursor into its name box
+    } catch (err) {
+      alert('Could not add sticker: ' + err.message)
+    } finally {
+      setAddingSticker(false)
+    }
+  }
+
+  // Brackets would break the [name] tokens used in chat, so strip them.
+  function stickerNameLocal(id, value) {
+    const name = value.replace(/[\[\]]/g, '')
+    setStickers((prev) => prev.map((s) => (s.id === id ? { ...s, name } : s)))
+  }
+  async function stickerNameSave(s) {
+    try {
+      const res = await apiPost('/api/sticker/rename', { id: s.id, name: s.name.trim() })
+      setStickers((prev) => prev.map((x) => (x.id === s.id ? { ...x, name: res.name } : x)))
+    } catch {
+      // best effort; the local name stays as typed
+    }
+  }
+
+  async function deleteSticker(s) {
+    if (!confirm(`Remove sticker${s.name ? ` "${s.name}"` : ''}?`)) return
+    try {
+      await apiPost('/api/sticker/delete', { id: s.id })
+      setStickers((prev) => prev.filter((x) => x.id !== s.id))
+    } catch (err) {
+      alert('Could not remove sticker: ' + err.message)
+    }
+  }
+
   // Drag the volume slider: remember it, and give a little audible taste of the
   // new level (throttled so a drag doesn't machine-gun the speaker).
   function onVolume(e) {
@@ -158,6 +217,12 @@ export default function Settings({
       beep(v)
     }
   }
+
+  // The stickers to show in the manager: filtered by the search box (if any).
+  const q = stickerFilter.trim().toLowerCase()
+  const shownStickers = q
+    ? stickers.filter((s) => s.name.toLowerCase().includes(q))
+    : stickers
 
   return (
     <div className="settings">
@@ -274,6 +339,74 @@ export default function Settings({
             ? <img className="bg-preview" src={me.chatBg} alt="" />
             : <span className="muted">none</span>}
         </UploadRow>
+      </section>
+
+      <section className="setting-card">
+        <div className="setting-row sticker-mgr-head">
+          <div className="setting-label">
+            Stickers 🐾
+            <small>
+              Shared with your partner
+              {stickers.length > 0 ? ` · ${stickers.length} saved` : ''}
+            </small>
+          </div>
+          <input ref={stickerFileRef} type="file" accept="image/*" hidden onChange={onPickSticker} />
+          <button
+            className="ghost-btn"
+            onClick={() => stickerFileRef.current?.click()}
+            disabled={addingSticker}
+          >
+            {addingSticker ? 'Adding…' : '＋ Add image/gif'}
+          </button>
+        </div>
+
+        {stickers.length === 0 ? (
+          <p className="muted sticker-mgr-empty">No stickers yet. Add an image or gif, then give it a name to send it by typing.</p>
+        ) : (
+          <>
+            {/* A search box keeps the collection manageable once it grows. */}
+            {stickers.length > 8 && (
+              <input
+                className="sticker-mgr-search"
+                type="search"
+                placeholder="Search by name…"
+                value={stickerFilter}
+                onChange={(e) => setStickerFilter(e.target.value)}
+              />
+            )}
+            {/* A compact scrolling grid, not a tall list, so 100 stickers stay
+                tidy: rename in place, delete from the corner (with a confirm). */}
+            <div className="sticker-mgr-grid">
+              {shownStickers.map((s) => (
+                <div key={s.id} className="sticker-mgr-cell">
+                  <button
+                    className="sticker-mgr-x"
+                    onClick={() => deleteSticker(s)}
+                    title="Remove"
+                  >
+                    ✕
+                  </button>
+                  <img className="sticker-mgr-img" src={s.path} alt={s.name} />
+                  <input
+                    className="sticker-mgr-name"
+                    data-id={s.id}
+                    value={s.name}
+                    placeholder="name…"
+                    maxLength={40}
+                    onChange={(e) => stickerNameLocal(s.id, e.target.value)}
+                    onBlur={() => stickerNameSave(s)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') e.target.blur()
+                    }}
+                  />
+                </div>
+              ))}
+              {shownStickers.length === 0 && (
+                <p className="muted sticker-mgr-empty">No sticker matches “{stickerFilter}”.</p>
+              )}
+            </div>
+          </>
+        )}
       </section>
 
       <section className="setting-card address-card">

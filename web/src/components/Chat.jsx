@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { apiGet, apiPost, apiUpload } from '../api.js'
+import { apiUpload } from '../api.js'
 
 // Avatar shows the person's uploaded photo, or a soft emoji fallback.
 function Avatar({ user, fallback }) {
@@ -62,6 +62,7 @@ export default function Chat({
   onSend,
   onTyping,
   dividerMsgId,
+  stickers,
 }) {
   const [text, setText] = useState('')
   const [uploading, setUploading] = useState(false)
@@ -70,18 +71,9 @@ export default function Chat({
   const dividerRef = useRef(null)
   const inputRef = useRef(null)
 
-  // The saved stickers are shared between both accounts. newName + the hidden
-  // file input drive adding a new one from the drawer.
-  const [stickers, setStickers] = useState([])
+  // Stickers are shared and managed in Settings; here the drawer is just for
+  // picking one to drop into the message.
   const [showPicker, setShowPicker] = useState(false)
-  const [newName, setNewName] = useState('')
-  const [addingSticker, setAddingSticker] = useState(false)
-  const stickerFileRef = useRef(null)
-
-  function loadStickers() {
-    apiGet('/api/stickers').then((d) => setStickers(d.stickers || [])).catch(() => {})
-  }
-  useEffect(loadStickers, [])
 
   // ESC closes the sticker drawer, so you don't have to reach for the ✕.
   useEffect(() => {
@@ -158,10 +150,11 @@ export default function Chat({
     }
   }
 
-  // insertToken drops a [name] token into the composer at the cursor, so
-  // stickers can sit anywhere between the words.
+  // insertToken drops a sticker into the composer at the cursor, so stickers can
+  // sit anywhere between the words. A named sticker inserts as a friendly
+  // [name] token; an as-yet-unnamed one inserts its direct reference.
   function insertToken(s) {
-    const token = `[${s.name}] `
+    const token = (s.name ? `[${s.name}]` : `[[sticker:${s.path}]]`) + ' '
     const el = inputRef.current
     if (el) {
       const start = el.selectionStart ?? text.length
@@ -174,39 +167,6 @@ export default function Chat({
       })
     } else {
       setText(text + token)
-    }
-  }
-
-  // Add a new sticker: a name (typed first) plus a chosen image/gif. Square
-  // brackets are stripped from names since they'd break the [name] tokens.
-  async function onPickSticker(e) {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (!file) return
-    const name = newName.replace(/[\[\]]/g, '').trim()
-    if (!name) {
-      alert('Give the sticker a name first 🐾')
-      return
-    }
-    setAddingSticker(true)
-    try {
-      const { sticker } = await apiUpload('/api/upload/sticker', file, { name })
-      setStickers((prev) => [sticker, ...prev])
-      setNewName('')
-    } catch (err) {
-      alert('Could not add sticker: ' + err.message)
-    } finally {
-      setAddingSticker(false)
-    }
-  }
-
-  async function deleteSticker(s) {
-    if (!confirm(`Remove sticker "${s.name}"?`)) return
-    try {
-      await apiPost('/api/sticker/delete', { id: s.id })
-      setStickers((prev) => prev.filter((x) => x.id !== s.id))
-    } catch (err) {
-      alert('Could not remove sticker: ' + err.message)
     }
   }
 
@@ -288,7 +248,8 @@ export default function Chat({
         })}
       </div>
 
-      {/* The sticker drawer: pick to insert into the message, or add a new one. */}
+      {/* The sticker drawer: tap one to drop it into the message. Adding,
+          naming, and deleting live in Settings so nothing here is destructive. */}
       {showPicker && (
         <div className="sticker-drawer">
           <div className="sticker-drawer-head">
@@ -297,39 +258,16 @@ export default function Chat({
           </div>
           <div className="sticker-grid">
             {stickers.length === 0 && (
-              <div className="sticker-empty">No stickers yet — add your first below 💛</div>
+              <div className="sticker-empty">No stickers yet — add some in Settings ⚙️</div>
             )}
             {stickers.map((s) => (
-              <div key={s.id} className="sticker-cell" title={s.name}>
-                <img src={s.path} alt={s.name} onClick={() => insertToken(s)} />
-                <span className="sticker-name">{s.name}</span>
-                <button className="sticker-del" onClick={() => deleteSticker(s)} title="Remove">✕</button>
-              </div>
+              <button key={s.id} className="sticker-cell pick" title={s.name} onClick={() => insertToken(s)}>
+                <img src={s.path} alt={s.name} />
+                {s.name && <span className="sticker-name">{s.name}</span>}
+              </button>
             ))}
           </div>
-          <div className="sticker-add">
-            <input
-              className="sticker-name-input"
-              placeholder="Name (中文 or English)"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              maxLength={40}
-            />
-            <input
-              ref={stickerFileRef}
-              type="file"
-              accept="image/*"
-              hidden
-              onChange={onPickSticker}
-            />
-            <button
-              className="ghost-btn"
-              onClick={() => stickerFileRef.current?.click()}
-              disabled={addingSticker || !newName.trim()}
-            >
-              {addingSticker ? 'Adding…' : '＋ Add image/gif'}
-            </button>
-          </div>
+          <div className="sticker-drawer-foot">Manage stickers in Settings ⚙️</div>
         </div>
       )}
 

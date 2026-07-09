@@ -207,6 +207,18 @@ function playClearSound() {
   }
 }
 
+// relTime turns a timestamp into a short "how long ago" label for the plays.
+function relTime(ms) {
+  const s = Math.max(0, (Date.now() - ms) / 1000)
+  if (s < 60) return 'just now'
+  const m = Math.floor(s / 60)
+  if (m < 60) return `${m}m ago`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}h ago`
+  const d = Math.floor(h / 24)
+  return d === 1 ? 'yesterday' : `${d}d ago`
+}
+
 export default function DogSand() {
   const canvasRef = useRef(null)
   const [status, setStatus] = useState('idle') // idle | playing | over
@@ -234,6 +246,7 @@ export default function DogSand() {
       legTick: 0, // drives the running-legs animation
       soft: false, // is soft-drop (down) held?
       move: 0, // -1 / 0 / +1 horizontal intent this frame
+      spawned: 0, // how many pups so far — drives the speed ramp
       raf: 0,
       running: false,
     }),
@@ -257,6 +270,7 @@ export default function DogSand() {
       },
     }
     st.fallTick = 0
+    st.spawned++
     return true
   }, [])
 
@@ -273,10 +287,13 @@ export default function DogSand() {
         st.dog.x += st.move
       }
 
-      // Gravity on the pup.
+      // Gravity on the pup. The longer you play, the faster they fall, so the
+      // gap between pups keeps tightening (every 6 pups shaves a frame, down to
+      // a brisk floor).
       if (st.dog) {
         st.fallTick++
-        const every = st.soft ? SOFT_FALL_EVERY : FALL_EVERY
+        const ramped = Math.max(2, FALL_EVERY - Math.floor(st.spawned / 6))
+        const every = st.soft ? SOFT_FALL_EVERY : ramped
         if (st.fallTick >= every) {
           st.fallTick = 0
           if (canMove(st.grid, st.dog, 0, 1)) {
@@ -334,17 +351,30 @@ export default function DogSand() {
     [spawnDog],
   )
 
-  // Finish the game: stop the loop and submit the score to the shared board.
+  // Submit the current score to the shared board. The server only keeps it if
+  // it beats the record, so it's safe to call whenever a run ends — including
+  // just walking away. withUi updates the on-screen best + "new record" note;
+  // we skip that when the component is going away (leaving the Play tab).
+  const submitScore = useCallback((withUi) => {
+    const sc = scoreRef.current
+    if (sc <= 0) return
+    const p = apiPost('/api/game/score', { score: sc })
+    if (withUi) {
+      p.then((g) => {
+        setHigh(g)
+        if (g.isNewRecord) setFlash('🏆 New record!')
+      }).catch(() => {})
+    } else {
+      p.catch(() => {})
+    }
+  }, [])
+
+  // Finish the game: stop the loop and bank the score.
   const endGame = useCallback((st) => {
     st.running = false
     setStatus('over')
-    apiPost('/api/game/score', { score: scoreRef.current })
-      .then((g) => {
-        setHigh(g)
-        if (g.isNewRecord) setFlash('🏆 New record!')
-      })
-      .catch(() => {})
-  }, [])
+    submitScore(true)
+  }, [submitScore])
 
   // Draw the current frame: the settled sand as pixels, then the running (or
   // melting) pup on top as a little vector sprite.
@@ -404,15 +434,36 @@ export default function DogSand() {
     st.raf = requestAnimationFrame(loop)
   }, [makeSim, spawnDog, loop])
 
-  // Stop the loop if we leave the screen mid-game.
+  // Leaving the Play screen mid-game (switching tabs, logging out) counts as
+  // stopping: bank the score first — the game is hard to lose, so most bests
+  // come from simply walking away, not from dying.
   useEffect(() => {
     return () => {
       const st = sim.current
       if (st) {
+        if (st.running) submitScore(false)
         st.running = false
         cancelAnimationFrame(st.raf)
       }
     }
+  }, [submitScore])
+
+  // Closing the tab / navigating away mid-game also banks the score. fetch with
+  // keepalive survives the page unload where a normal request would be dropped.
+  useEffect(() => {
+    const onLeave = () => {
+      const st = sim.current
+      if (st && st.running && scoreRef.current > 0) {
+        fetch('/api/game/score', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ score: scoreRef.current }),
+          keepalive: true,
+        }).catch(() => {})
+      }
+    }
+    window.addEventListener('pagehide', onLeave)
+    return () => window.removeEventListener('pagehide', onLeave)
   }, [])
 
   // Keyboard controls: ← → steer, ↓ soft-drop. Held keys set the intent; the
@@ -495,6 +546,19 @@ export default function DogSand() {
                 </p>
                 <button className="send-btn" onClick={start}>Play again 🐶</button>
               </>
+            )}
+
+            {high?.plays?.length > 0 && (
+              <div className="game-plays">
+                <div className="game-plays-title">Recent plays</div>
+                {high.plays.map((p, i) => (
+                  <div key={i} className="game-play-row">
+                    <span className="game-play-who">{p.name}</span>
+                    <span className="game-play-score">⭐ {p.score}</span>
+                    <span className="game-play-when">{relTime(p.at)}</span>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         )}

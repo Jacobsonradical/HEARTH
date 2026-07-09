@@ -41,6 +41,14 @@ type Sticker struct {
 	CreatedAt int64  `json:"createdAt"` // unix milliseconds
 }
 
+// GamePlay is one finished game in the recent-plays feed: who played, their
+// score, and when (unix milliseconds).
+type GamePlay struct {
+	Name  string `json:"name"`
+	Score int    `json:"score"`
+	At    int64  `json:"at"`
+}
+
 // GardenRow is the raw persisted garden state (single row). The higher level
 // garden package turns this into a view with tree stage, season, etc.
 type GardenRow struct {

@@ -27,6 +27,7 @@ export default function App() {
   const [messages, setMessages] = useState([])
   const [garden, setGarden] = useState(null)
   const [notifSounds, setNotifSounds] = useState([]) // my personal alert sounds
+  const [stickers, setStickers] = useState([]) // shared 表情包, managed in Settings
   const [presence, setPresence] = useState([]) // [{id, status}] of connected people
   const [partnerTyping, setPartnerTyping] = useState(false)
   const [unread, setUnread] = useState(0)
@@ -144,6 +145,7 @@ export default function App() {
     apiGet('/api/messages').then((d) => setMessages(d.messages || [])).catch(() => {})
     apiGet('/api/garden').then(setGarden).catch(() => {})
     apiGet('/api/notif-sounds').then((d) => setNotifSounds(d.sounds || [])).catch(() => {})
+    apiGet('/api/stickers').then((d) => setStickers(d.stickers || [])).catch(() => {})
 
     const socket = new WebSocket(wsURL())
     ws.current = socket
@@ -349,6 +351,7 @@ export default function App() {
             onSend={sendMessage}
             onTyping={notifyTyping}
             dividerMsgId={dividerMsgId}
+            stickers={stickers}
           />
         )}
         {tab === 'garden' && <Garden garden={garden} setGarden={setGarden} />}
@@ -361,6 +364,8 @@ export default function App() {
             setNickname={setNickname}
             notifSounds={notifSounds}
             setNotifSounds={setNotifSounds}
+            stickers={stickers}
+            setStickers={setStickers}
             theme={theme}
             setTheme={setTheme}
             onLogout={handleLogout}

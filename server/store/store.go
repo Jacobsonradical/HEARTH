@@ -149,6 +149,16 @@ CREATE TABLE IF NOT EXISTS game_high (
     updated_at INTEGER NOT NULL DEFAULT 0
 );
 INSERT OR IGNORE INTO game_high (id, score, holder_id, updated_at) VALUES (1, 0, 0, 0);
+
+-- One row per finished game, so we can show the most recent plays (who, when,
+-- score). Kept small by only ever reading the newest few.
+CREATE TABLE IF NOT EXISTS game_plays (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL,
+    score      INTEGER NOT NULL,
+    created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_game_plays_id ON game_plays(id);
 `
 	_, err := s.db.Exec(schema)
 	return err
@@ -583,6 +593,13 @@ func (s *Store) ListStickers() ([]*Sticker, error) {
 	return out, rows.Err()
 }
 
+// RenameSticker changes a sticker's name (used when a sticker is named after it
+// was added, or renamed later). An empty name is allowed.
+func (s *Store) RenameSticker(id int64, name string) error {
+	_, err := s.db.Exec(`UPDATE stickers SET name = ? WHERE id = ?`, name, id)
+	return err
+}
+
 // DeleteSticker removes a sticker row and returns its file path so the caller
 // can delete the file too. Returns "" if the sticker did not exist.
 func (s *Store) DeleteSticker(id int64) (string, error) {
@@ -623,4 +640,34 @@ func (s *Store) SubmitGameScore(userID int64, score int) (bool, error) {
 	}
 	n, _ := res.RowsAffected()
 	return n > 0, nil
+}
+
+// RecordGamePlay logs one finished game for the recent-plays feed.
+func (s *Store) RecordGamePlay(userID int64, score int) error {
+	_, err := s.db.Exec(
+		`INSERT INTO game_plays (user_id, score, created_at) VALUES (?, ?, ?)`,
+		userID, score, time.Now().UnixMilli())
+	return err
+}
+
+// RecentGamePlays returns the newest plays (who, when, score), most recent
+// first. The display name is resolved by joining users.
+func (s *Store) RecentGamePlays(limit int) ([]GamePlay, error) {
+	rows, err := s.db.Query(
+		`SELECT COALESCE(u.display_name, '—'), p.score, p.created_at
+		 FROM game_plays p LEFT JOIN users u ON u.id = p.user_id
+		 ORDER BY p.id DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []GamePlay
+	for rows.Next() {
+		var p GamePlay
+		if err := rows.Scan(&p.Name, &p.Score, &p.At); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
 }

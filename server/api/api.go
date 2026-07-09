@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"image/gif"
 	"io"
 	"log"
 	"net/http"
@@ -64,6 +65,7 @@ func (s *Server) Mount(mux *http.ServeMux) {
 	mux.Handle("POST /api/upload/message-image", s.protect(s.handleUploadMessageImage))
 	mux.Handle("GET /api/stickers", s.protect(s.handleListStickers))
 	mux.Handle("POST /api/upload/sticker", s.protect(s.handleUploadSticker))
+	mux.Handle("POST /api/sticker/rename", s.protect(s.handleRenameSticker))
 	mux.Handle("POST /api/sticker/delete", s.protect(s.handleDeleteSticker))
 	mux.Handle("GET /api/garden", s.protect(s.handleGarden))
 	mux.Handle("GET /api/weather", s.protect(s.handleWeather))
@@ -395,15 +397,17 @@ func (s *Server) handleWater(w http.ResponseWriter, r *http.Request) {
 // --- Game high score -------------------------------------------------------
 
 // gameHigh is the JSON shape for the shared best score: the score plus who set
-// it, so both of us see one leaderboard.
+// it (so both of us see one leaderboard), and the most recent plays.
 type gameHigh struct {
-	Score       int    `json:"score"`
-	HolderID    int64  `json:"holderId"`
-	HolderName  string `json:"holderName"`
-	IsNewRecord bool   `json:"isNewRecord,omitempty"`
+	Score       int              `json:"score"`
+	HolderID    int64            `json:"holderId"`
+	HolderName  string           `json:"holderName"`
+	IsNewRecord bool             `json:"isNewRecord,omitempty"`
+	Plays       []store.GamePlay `json:"plays"`
 }
 
-// loadGameHigh reads the current best and resolves the holder's display name.
+// loadGameHigh reads the current best (with the holder's display name) plus the
+// five most recent plays.
 func (s *Server) loadGameHigh() (gameHigh, error) {
 	score, holderID, err := s.st.GameHigh()
 	if err != nil {
@@ -415,6 +419,14 @@ func (s *Server) loadGameHigh() (gameHigh, error) {
 			g.HolderName = u.DisplayName
 		}
 	}
+	plays, err := s.st.RecentGamePlays(5)
+	if err != nil {
+		return gameHigh{}, err
+	}
+	if plays == nil {
+		plays = []store.GamePlay{}
+	}
+	g.Plays = plays
 	return g, nil
 }
 
@@ -440,6 +452,12 @@ func (s *Server) handleSubmitGameScore(w http.ResponseWriter, r *http.Request) {
 	if req.Score < 0 {
 		httpError(w, http.StatusBadRequest, "invalid score")
 		return
+	}
+	// Log the play (skip empty runs) so the recent-plays feed shows real games.
+	if req.Score > 0 {
+		if err := s.st.RecordGamePlay(me.ID, req.Score); err != nil {
+			log.Printf("failed to record game play: %v", err)
+		}
 	}
 	isNew, err := s.st.SubmitGameScore(me.ID, req.Score)
 	if err != nil {
@@ -650,26 +668,25 @@ func (s *Server) handleListStickers(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"stickers": list})
 }
 
-// handleUploadSticker saves a new sticker: an image or gif plus a name (Chinese
-// or English). Once saved it's available to both of us.
+// handleUploadSticker saves a new sticker: an image or gif. The name is
+// optional — the usual flow is to add the picture first and name it after —
+// and can be set later with rename. Once saved it's available to both of us.
 func (s *Server) handleUploadSticker(w http.ResponseWriter, r *http.Request) {
 	me := auth.UserFrom(r.Context())
-	// The file is validated and stored first; the name rides alongside it in the
-	// same multipart form, read once ParseMultipartForm has run inside saveUploadTo.
+	// The file is validated and stored first; an optional name rides alongside
+	// it in the same multipart form (read after ParseMultipartForm in saveUploadTo).
 	path, ok := s.saveUploadTo(w, r, imageExts, maxImageBytes, "stickers")
 	if !ok {
 		return
 	}
 	name := strings.TrimSpace(r.FormValue("name"))
-	if name == "" {
-		s.removeUpload(path) // don't leave an orphaned file behind
-		httpError(w, http.StatusBadRequest, "please give the sticker a name")
-		return
+	if r := []rune(name); len(r) > maxStickerNameLen {
+		name = string(r[:maxStickerNameLen])
 	}
-	if len([]rune(name)) > maxStickerNameLen {
-		s.removeUpload(path)
-		httpError(w, http.StatusBadRequest, "that name is a little too long")
-		return
+	// Make animated gifs loop forever, so a sticker keeps moving instead of
+	// freezing after the file's own (possibly one-shot) loop count.
+	if strings.HasSuffix(strings.ToLower(path), ".gif") {
+		s.loopGifForever(path)
 	}
 	sticker, err := s.st.AddSticker(name, me.ID, path)
 	if err != nil {
@@ -678,6 +695,58 @@ func (s *Server) handleUploadSticker(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"sticker": sticker})
+}
+
+// handleRenameSticker sets (or changes) a sticker's name after the fact.
+func (s *Server) handleRenameSticker(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ID   int64  `json:"id"`
+		Name string `json:"name"`
+	}
+	if !readJSON(w, r, &req) {
+		return
+	}
+	name := strings.TrimSpace(req.Name)
+	if r := []rune(name); len(r) > maxStickerNameLen {
+		name = string(r[:maxStickerNameLen])
+	}
+	if err := s.st.RenameSticker(req.ID, name); err != nil {
+		httpError(w, http.StatusInternalServerError, "failed to rename sticker")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"name": name})
+}
+
+// loopGifForever rewrites an animated gif so it loops endlessly. GIFs carry a
+// loop count; some are authored to play once, which makes a sticker stop
+// moving. Decoding and re-encoding with LoopCount 0 (infinite) fixes that. A
+// non-gif or single-frame file is left untouched. Best-effort: any failure just
+// leaves the original file as it was.
+func (s *Server) loopGifForever(pubPath string) {
+	rel := strings.TrimPrefix(pubPath, "/uploads/")
+	full := filepath.Join(s.uploadDir, filepath.Clean("/"+rel))
+	f, err := os.Open(full)
+	if err != nil {
+		return
+	}
+	g, err := gif.DecodeAll(f)
+	f.Close()
+	if err != nil || len(g.Image) <= 1 || g.LoopCount == 0 {
+		return // not animated, or already loops forever
+	}
+	g.LoopCount = 0
+	tmp := full + ".tmp"
+	out, err := os.Create(tmp)
+	if err != nil {
+		return
+	}
+	if err := gif.EncodeAll(out, g); err != nil {
+		out.Close()
+		os.Remove(tmp)
+		return
+	}
+	out.Close()
+	os.Rename(tmp, full)
 }
 
 // handleDeleteSticker removes a sticker (row + file). Either partner may delete,
