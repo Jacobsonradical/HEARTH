@@ -311,6 +311,26 @@ export default function Garden({ garden, setGarden }) {
               <circle cx="31" cy="22" r="2.4" fill="#ffb199" opacity="0.7" />
             </svg>
           )}
+
+          {/* The moon's face: the very same smile, but eyes closed and dozing —
+              softly shut lids and a little zZ. */}
+          {sunSmile && night && (
+            <svg className="moon-face" viewBox="0 0 40 40" aria-hidden="true">
+              {/* peacefully closed eyes (gentle downward lids) */}
+              <path d="M9 16 Q13 20 17 16" stroke="#8681a3" strokeWidth="2.2"
+                fill="none" strokeLinecap="round" />
+              <path d="M23 16 Q27 20 31 16" stroke="#8681a3" strokeWidth="2.2"
+                fill="none" strokeLinecap="round" />
+              {/* the same style of smile as the sun */}
+              <path d="M13 25 Q 20 31 27 25" stroke="#8681a3" strokeWidth="2.4"
+                fill="none" strokeLinecap="round" />
+              <circle cx="9" cy="22" r="2.4" fill="#c9a9d8" opacity="0.6" />
+              <circle cx="31" cy="22" r="2.4" fill="#c9a9d8" opacity="0.6" />
+              {/* a sleepy little zZ drifting up from the corner */}
+              <text className="moon-zzz" x="30" y="12" fill="#8681a3">z</text>
+              <text className="moon-zzz2" x="34" y="7" fill="#8681a3">z</text>
+            </svg>
+          )}
         </div>
 
         {night &&

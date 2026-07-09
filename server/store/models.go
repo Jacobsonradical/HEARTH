@@ -22,6 +22,25 @@ type Message struct {
 	CreatedAt int64  `json:"createdAt"` // unix milliseconds
 }
 
+// NotifSound is one of a user's personal notification sounds. Each account can
+// have several; a new message plays one at random.
+type NotifSound struct {
+	ID        int64  `json:"id"`
+	Path      string `json:"path"`
+	CreatedAt int64  `json:"createdAt"` // unix milliseconds
+}
+
+// Sticker is a saved 表情包 (a figure or gif) with a searchable name. Stickers
+// are shared: whoever adds one, both accounts can send it. The file lives under
+// <data>/uploads/stickers/, so it's covered by the normal backup.
+type Sticker struct {
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	OwnerID   int64  `json:"ownerId"`
+	Path      string `json:"path"`
+	CreatedAt int64  `json:"createdAt"` // unix milliseconds
+}
+
 // GardenRow is the raw persisted garden state (single row). The higher level
 // garden package turns this into a view with tree stage, season, etc.
 type GardenRow struct {

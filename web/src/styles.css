@@ -354,6 +354,128 @@ input:focus, textarea:focus { border-color: var(--pink-deep); }
   padding: 10px 16px;
   box-shadow: var(--shadow);
 }
+.icon-btn.active { background: var(--pink); }
+.icon-btn.small { width: 30px; height: 30px; font-size: 14px; box-shadow: none; }
+
+/* --- Stickers (表情包) --------------------------------------------------- */
+/* A sticker sent on its own shows large and frameless, like a big emoji. */
+.msg-image.sticker { max-width: 130px; border-radius: 8px; }
+/* The extra .msg-row lifts specificity above ".msg-row.mine .bubble", so a
+   lone sticker really does lose its bubble on both sides. */
+.msg-row .bubble.sticker-only {
+  background: transparent;
+  box-shadow: none;
+  padding: 2px 4px;
+}
+.msg-row .bubble.sticker-only .msg-time { text-align: left; }
+
+/* The drawer of saved stickers, opened from the 😀 button. */
+.sticker-drawer {
+  background: rgba(255, 255, 255, 0.92);
+  border-top: 1px solid rgba(180, 140, 160, 0.18);
+  padding: 10px 12px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.sticker-drawer-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.sticker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(74px, 1fr));
+  gap: 8px;
+}
+.sticker-empty { grid-column: 1 / -1; color: var(--ink-soft); font-size: 13px; padding: 6px 0; }
+.sticker-cell {
+  position: relative;
+  background: var(--cream);
+  border-radius: 12px;
+  padding: 6px 4px 4px;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(150, 150, 180, 0.12);
+}
+.sticker-cell img {
+  width: 100%;
+  height: 56px;
+  object-fit: contain;
+  cursor: pointer;
+}
+.sticker-name {
+  display: block;
+  font-size: 11px;
+  color: var(--ink-soft);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sticker-del {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  font-size: 11px;
+  line-height: 1;
+  background: rgba(255, 255, 255, 0.85);
+  color: #b3474b;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+.sticker-add {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  align-items: center;
+}
+.sticker-name-input { flex: 1; }
+
+/* Stickers sent inline with text, flowing inside the bubble like big emoji.
+   A sticker-only message (no words) gets the bigger "big" size. */
+.msg-sticker {
+  height: 64px;
+  max-width: 120px;
+  object-fit: contain;
+  vertical-align: middle;
+  margin: 0 2px;
+  border-radius: 8px;
+  display: inline-block;
+}
+.msg-sticker.big { height: 110px; max-width: 160px; }
+
+/* The composer plus its floating type-to-search popup. */
+.composer-wrap { position: relative; }
+.sticker-search {
+  position: absolute;
+  right: 10px;
+  bottom: 100%;
+  margin-bottom: 6px;
+  max-width: min(280px, 80%);
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  padding: 6px;
+}
+/* Three across, and slide (scroll) to reveal the next three. */
+.sticker-search-strip {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+}
+.search-cell {
+  flex: 0 0 auto;
+  width: 76px;
+  height: 76px;
+  background: var(--cream);
+  border-radius: 10px;
+  padding: 4px;
+  scroll-snap-align: start;
+}
+.search-cell img { width: 100%; height: 100%; object-fit: contain; }
 
 /* --- Garden -------------------------------------------------------------- */
 .garden {
@@ -443,6 +565,33 @@ input:focus, textarea:focus { border-color: var(--pink-deep); }
     radial-gradient(circle at 42% 70%, rgba(0,0,0,0.05) 3px, transparent 4px),
     radial-gradient(circle at 40% 38%, #fbf8e6, #e8e2c4 75%);
   box-shadow: 0 0 30px 8px rgba(240, 234, 190, 0.35);
+}
+/* Nudging the moon awake for a moment: a slow, sleepy nuzzle (unlike the sun's
+   energetic wiggle) and a softly brighter glow, peeking in front of clouds. */
+.moon.happy {
+  animation: moon-doze 2.2s ease;
+  box-shadow: 0 0 38px 12px rgba(240, 234, 190, 0.5);
+  z-index: 2;
+}
+@keyframes moon-doze {
+  0%   { rotate: 0deg; scale: 1; }
+  30%  { rotate: -7deg; scale: 1.06; }
+  65%  { rotate: 4deg; scale: 1.03; }
+  100% { rotate: 0deg; scale: 1; }
+}
+.moon-face {
+  position: absolute;
+  inset: 0;
+  animation: face-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.moon-face text { font-size: 9px; font-weight: 700; font-family: inherit; }
+/* The little zZ floats up and fades, twice over. */
+.moon-zzz { animation: zzz-float 2.2s ease-in-out both; }
+.moon-zzz2 { font-size: 7px !important; animation: zzz-float 2.2s ease-in-out 0.3s both; }
+@keyframes zzz-float {
+  0%   { opacity: 0; transform: translateY(3px); }
+  30%  { opacity: 0.9; }
+  100% { opacity: 0; transform: translateY(-4px); }
 }
 .star {
   position: absolute;
@@ -814,6 +963,40 @@ input:focus, textarea:focus { border-color: var(--pink-deep); }
 }
 .muted { color: var(--ink-soft); font-size: 13px; }
 
+/* Notification sounds: a wrapping row of little play/delete chips + Add. */
+.sound-row { align-items: flex-start; }
+.sound-control {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 240px;
+}
+.sound-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 4px 3px 3px;
+  border-radius: 999px;
+  background: var(--cream);
+  box-shadow: 0 1px 4px rgba(150, 150, 180, 0.15);
+}
+.sound-play {
+  width: 24px;
+  height: 24px;
+  font-size: 11px;
+  background: var(--mint);
+  color: #3f7a5e;
+}
+.sound-name { font-size: 12px; color: var(--ink-soft); }
+.sound-del {
+  width: 20px;
+  height: 20px;
+  font-size: 10px;
+  background: #ffe0e0;
+  color: #b3474b;
+}
+.volume-slider { width: 150px; accent-color: var(--pink-deep); }
+.volume-pct { font-size: 12px; font-weight: 700; color: var(--ink-soft); min-width: 34px; }
+
 .settings-footer {
   display: flex;
   align-items: center;
@@ -829,10 +1012,106 @@ input:focus, textarea:focus { border-color: var(--pink-deep); }
   padding: 10px 20px;
 }
 
+/* --- Puppy Sandfall game ------------------------------------------------- */
+.game {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+}
+/* The score chip floats in the top-right corner of the play field, always in
+   sight without stealing space from the game. */
+.game-scores {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0;
+  padding: 5px 10px;
+  border-radius: 12px;
+  /* translucent so a pup spawning behind it stays visible */
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 2px 8px rgba(180, 130, 150, 0.2);
+  pointer-events: none; /* clicks pass through to the game */
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--ink);
+}
+.game-high { color: var(--ink-soft); font-weight: 600; font-size: 11px; }
+
+/* The stage centres the frame; the frame matches the canvas box exactly, so
+   the score chip and overlays pin to the play field itself. */
+.game-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+}
+.game-frame {
+  position: relative;
+  height: 100%;
+  max-height: 62vh;
+  aspect-ratio: 360 / 560; /* the canvas's native proportions */
+  max-width: 100%;
+}
+.game-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  image-rendering: pixelated; /* keep the sand grains crisp when scaled */
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  /* A soft sky-to-meadow wash shows through the transparent (empty) cells. */
+  background: linear-gradient(180deg, var(--sky) 0%, #eaf6ff 55%, var(--mint) 100%);
+  touch-action: none; /* don't let touch-drag scroll the page while playing */
+}
+.game-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
+  padding: 18px;
+  border-radius: var(--radius);
+  background: rgba(255, 247, 240, 0.82);
+  backdrop-filter: blur(3px);
+}
+.game-title { font-size: 22px; font-weight: 800; }
+.game-blurb { max-width: 280px; color: var(--ink-soft); margin: 0; line-height: 1.5; }
+.game-flash { color: var(--pink-deep); font-weight: 800; }
+
+/* On-screen steering for phones (keyboard arrows also work on desktop). */
+.game-pad {
+  display: flex;
+  gap: 14px;
+}
+.pad-btn {
+  width: 60px;
+  height: 48px;
+  font-size: 20px;
+  background: var(--cream);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+  user-select: none;
+}
+.pad-btn:active { background: var(--pink); }
+
 /* On phones, let the app fill the screen and keep tap targets comfy. */
 @media (max-width: 520px) {
   .setting-control input { width: 120px; }
   .tabs button { padding: 8px 10px; }
+  .game-frame { max-height: 56vh; }
 }
 
 /* --- Dark mode --------------------------------------------------------------
@@ -869,10 +1148,26 @@ input:focus, textarea:focus { border-color: var(--pink-deep); }
 /* Settings */
 .dark .setting-card { background: rgba(33, 28, 44, 0.85); }
 .dark .setting-row { border-bottom-color: rgba(255, 255, 255, 0.07); }
+.dark .sound-chip { background: #2a2436; }
+.dark .sound-play { background: #2f4a3e; color: #b6e6cf; }
+.dark .sound-del { background: #4a2b31; color: #ff9d9d; }
 .dark .ghost-btn { background: #3a3154; color: #cfc2f5; }
 .dark .address-code { background: #2a2436; }
 .dark .address-hint code { background: rgba(255, 255, 255, 0.12); }
 .dark .logout-btn { background: #4a2b31; color: #ff9d9d; }
+
+/* Stickers */
+.dark .sticker-drawer { background: rgba(30, 25, 40, 0.94); border-top-color: rgba(255,255,255,0.08); }
+.dark .sticker-cell { background: #2a2436; }
+.dark .sticker-search { background: rgba(38, 32, 50, 0.97); }
+.dark .search-cell { background: #2a2436; }
+.dark .sticker-del { background: #3a3348; color: #ff9d9d; }
+
+/* Puppy Sandfall (the sky wash inside the canvas keeps its bright meadow) */
+.dark .game-overlay { background: rgba(24, 20, 33, 0.84); }
+.dark .game-scores { background: rgba(30, 25, 40, 0.82); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4); }
+.dark .pad-btn { background: #332b40; color: var(--ink); }
+.dark .pad-btn:active { background: #55324b; }
 
 /* Garden panel (the sky above stays true to the real time of day) */
 .dark .garden-panel { background: rgba(28, 23, 38, 0.88); }

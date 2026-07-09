@@ -106,6 +106,49 @@ CREATE TABLE IF NOT EXISTS read_state (
     user_id      INTEGER PRIMARY KEY,
     last_read_id INTEGER NOT NULL DEFAULT 0
 );
+
+-- A person's notification sounds. Each account can keep several; a new message
+-- plays one at random. Personal (not shared), so keyed by user_id.
+CREATE TABLE IF NOT EXISTS notif_sounds (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL,
+    path       TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_notif_sounds_user ON notif_sounds(user_id);
+
+-- Backfill: carry any single sound set on the old users.notif_sound column into
+-- the new table, so nobody loses the sound they'd already chosen. Idempotent
+-- (the NOT EXISTS guard means re-running startup won't duplicate it).
+INSERT INTO notif_sounds (user_id, path, created_at)
+    SELECT id, notif_sound, 0 FROM users
+    WHERE notif_sound != ''
+      AND NOT EXISTS (
+        SELECT 1 FROM notif_sounds ns
+        WHERE ns.user_id = users.id AND ns.path = users.notif_sound
+      );
+
+-- Saved stickers (表情包). Shared between both accounts: whoever uploads one,
+-- both can send it. The file lives under uploads/stickers/ so a backup of the
+-- data folder carries them along.
+CREATE TABLE IF NOT EXISTS stickers (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    name       TEXT NOT NULL,
+    owner_id   INTEGER NOT NULL,
+    path       TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_stickers_name ON stickers(name);
+
+-- Single-row table (id pinned to 1) holding the shared best score for the
+-- dog-sand game. holder_id is whoever set the current record.
+CREATE TABLE IF NOT EXISTS game_high (
+    id         INTEGER PRIMARY KEY CHECK (id = 1),
+    score      INTEGER NOT NULL DEFAULT 0,
+    holder_id  INTEGER NOT NULL DEFAULT 0,
+    updated_at INTEGER NOT NULL DEFAULT 0
+);
+INSERT OR IGNORE INTO game_high (id, score, holder_id, updated_at) VALUES (1, 0, 0, 0);
 `
 	_, err := s.db.Exec(schema)
 	return err
@@ -250,6 +293,60 @@ func (s *Store) SetNotifSound(id int64, path string) error {
 func (s *Store) SetChatBG(id int64, path string) error {
 	_, err := s.db.Exec(`UPDATE users SET chat_bg_path = ? WHERE id = ?`, path, id)
 	return err
+}
+
+// --- Notification sounds ---------------------------------------------------
+
+// AddNotifSound saves a new sound for a user and returns the stored row.
+func (s *Store) AddNotifSound(userID int64, path string) (*NotifSound, error) {
+	now := time.Now().UnixMilli()
+	res, err := s.db.Exec(
+		`INSERT INTO notif_sounds (user_id, path, created_at) VALUES (?, ?, ?)`,
+		userID, path, now)
+	if err != nil {
+		return nil, err
+	}
+	id, _ := res.LastInsertId()
+	return &NotifSound{ID: id, Path: path, CreatedAt: now}, nil
+}
+
+// ListNotifSounds returns a user's sounds, newest first.
+func (s *Store) ListNotifSounds(userID int64) ([]*NotifSound, error) {
+	rows, err := s.db.Query(
+		`SELECT id, path, created_at FROM notif_sounds WHERE user_id = ? ORDER BY id DESC`,
+		userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []*NotifSound
+	for rows.Next() {
+		n := &NotifSound{}
+		if err := rows.Scan(&n.ID, &n.Path, &n.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, n)
+	}
+	return out, rows.Err()
+}
+
+// DeleteNotifSound removes one of a user's sounds (scoped to the owner so a
+// person can only delete their own) and returns its file path so the caller can
+// delete the file too. Returns "" if it did not exist.
+func (s *Store) DeleteNotifSound(userID, id int64) (string, error) {
+	var path string
+	err := s.db.QueryRow(
+		`SELECT path FROM notif_sounds WHERE id = ? AND user_id = ?`, id, userID).Scan(&path)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	if _, err := s.db.Exec(`DELETE FROM notif_sounds WHERE id = ? AND user_id = ?`, id, userID); err != nil {
+		return "", err
+	}
+	return path, nil
 }
 
 // --- Nicknames -------------------------------------------------------------
@@ -444,6 +541,83 @@ func (s *Store) RecordAction(userID int64, day, action string) (bool, error) {
 	res, err := s.db.Exec(
 		`INSERT OR IGNORE INTO garden_actions (user_id, day, action) VALUES (?, ?, ?)`,
 		userID, day, action)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
+}
+
+// --- Stickers --------------------------------------------------------------
+
+// AddSticker saves a new sticker and returns the stored row.
+func (s *Store) AddSticker(name string, ownerID int64, path string) (*Sticker, error) {
+	now := time.Now().UnixMilli()
+	res, err := s.db.Exec(
+		`INSERT INTO stickers (name, owner_id, path, created_at) VALUES (?, ?, ?, ?)`,
+		name, ownerID, path, now)
+	if err != nil {
+		return nil, err
+	}
+	id, _ := res.LastInsertId()
+	return &Sticker{ID: id, Name: name, OwnerID: ownerID, Path: path, CreatedAt: now}, nil
+}
+
+// ListStickers returns every sticker, newest first. They're shared, so both
+// accounts see the same list.
+func (s *Store) ListStickers() ([]*Sticker, error) {
+	rows, err := s.db.Query(
+		`SELECT id, name, owner_id, path, created_at FROM stickers ORDER BY id DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []*Sticker
+	for rows.Next() {
+		st := &Sticker{}
+		if err := rows.Scan(&st.ID, &st.Name, &st.OwnerID, &st.Path, &st.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, st)
+	}
+	return out, rows.Err()
+}
+
+// DeleteSticker removes a sticker row and returns its file path so the caller
+// can delete the file too. Returns "" if the sticker did not exist.
+func (s *Store) DeleteSticker(id int64) (string, error) {
+	var path string
+	err := s.db.QueryRow(`SELECT path FROM stickers WHERE id = ?`, id).Scan(&path)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	if _, err := s.db.Exec(`DELETE FROM stickers WHERE id = ?`, id); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+// --- Game high score -------------------------------------------------------
+
+// GameHigh returns the shared best game score and the id of whoever set it
+// (holder id 0 means nobody has scored yet).
+func (s *Store) GameHigh() (score int, holderID int64, err error) {
+	err = s.db.QueryRow(`SELECT score, holder_id FROM game_high WHERE id = 1`).
+		Scan(&score, &holderID)
+	return
+}
+
+// SubmitGameScore records a new score if it beats the current best. It returns
+// true when a new record was set. The best is shared between both accounts, so
+// a single leaderboard reflects whoever played best.
+func (s *Store) SubmitGameScore(userID int64, score int) (bool, error) {
+	res, err := s.db.Exec(
+		`UPDATE game_high SET score = ?, holder_id = ?, updated_at = ?
+		 WHERE id = 1 AND score < ?`,
+		score, userID, time.Now().UnixMilli(), score)
 	if err != nil {
 		return false, err
 	}

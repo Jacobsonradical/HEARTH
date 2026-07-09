@@ -4,6 +4,7 @@ import Login from './components/Login.jsx'
 import Setup from './components/Setup.jsx'
 import Chat from './components/Chat.jsx'
 import Garden from './components/Garden.jsx'
+import DogSand from './components/DogSand.jsx'
 import Settings from './components/Settings.jsx'
 
 // App is the shell: it owns the session, the single shared WebSocket, and the
@@ -25,6 +26,7 @@ export default function App() {
 
   const [messages, setMessages] = useState([])
   const [garden, setGarden] = useState(null)
+  const [notifSounds, setNotifSounds] = useState([]) // my personal alert sounds
   const [presence, setPresence] = useState([]) // [{id, status}] of connected people
   const [partnerTyping, setPartnerTyping] = useState(false)
   const [unread, setUnread] = useState(0)
@@ -36,8 +38,10 @@ export default function App() {
   const ws = useRef(null)
   const meRef = useRef(null) // latest "me" for use inside ws callbacks
   const tabRef = useRef(tab)
+  const notifSoundsRef = useRef([]) // latest sounds, for use inside ws callbacks
   meRef.current = me
   tabRef.current = tab
+  notifSoundsRef.current = notifSounds
 
   // Presence status plumbing. lastActivityRef is when I last moved the mouse or
   // typed; lastStatusRef avoids re-sending an unchanged status; the typing refs
@@ -117,12 +121,16 @@ export default function App() {
       .finally(() => setLoading(false))
   }, [loadMe])
 
-  // Play the personal notification sound when a message arrives from my partner
-  // while I'm not looking at the chat.
+  // Play a notification sound when a message arrives from my partner while I'm
+  // not looking at the chat. I can keep several sounds — one is picked at
+  // random each time — and a per-device volume scales them all.
   const playNotif = useCallback(() => {
-    const sound = meRef.current?.notifSound
-    if (!sound) return
-    const audio = new Audio(sound)
+    const sounds = notifSoundsRef.current
+    if (!sounds || sounds.length === 0) return
+    const pick = sounds[Math.floor(Math.random() * sounds.length)]
+    const audio = new Audio(pick.path)
+    const vol = parseFloat(localStorage.getItem('hearth_notif_volume'))
+    audio.volume = Number.isFinite(vol) ? Math.min(1, Math.max(0, vol)) : 1
     audio.play().catch(() => {
       // Browsers block autoplay until the first interaction; that's fine.
     })
@@ -135,6 +143,7 @@ export default function App() {
     let closed = false
     apiGet('/api/messages').then((d) => setMessages(d.messages || [])).catch(() => {})
     apiGet('/api/garden').then(setGarden).catch(() => {})
+    apiGet('/api/notif-sounds').then((d) => setNotifSounds(d.sounds || [])).catch(() => {})
 
     const socket = new WebSocket(wsURL())
     ws.current = socket
@@ -319,6 +328,9 @@ export default function App() {
           <button className={tab === 'garden' ? 'active' : ''} onClick={() => setTab('garden')}>
             🌱 Garden
           </button>
+          <button className={tab === 'play' ? 'active' : ''} onClick={() => setTab('play')}>
+            🐾 Play
+          </button>
           <button className={tab === 'settings' ? 'active' : ''} onClick={() => setTab('settings')}>
             ⚙️ Setting
           </button>
@@ -340,12 +352,15 @@ export default function App() {
           />
         )}
         {tab === 'garden' && <Garden garden={garden} setGarden={setGarden} />}
+        {tab === 'play' && <DogSand />}
         {tab === 'settings' && (
           <Settings
             me={me}
             setMe={setMe}
             nickname={nickname}
             setNickname={setNickname}
+            notifSounds={notifSounds}
+            setNotifSounds={setNotifSounds}
             theme={theme}
             setTheme={setTheme}
             onLogout={handleLogout}

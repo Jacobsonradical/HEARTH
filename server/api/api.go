@@ -58,11 +58,18 @@ func (s *Server) Mount(mux *http.ServeMux) {
 	mux.Handle("POST /api/nickname", s.protect(s.handleNickname))
 	mux.Handle("POST /api/upload/avatar", s.protect(s.handleUploadAvatar))
 	mux.Handle("POST /api/upload/notif-sound", s.protect(s.handleUploadNotifSound))
+	mux.Handle("GET /api/notif-sounds", s.protect(s.handleListNotifSounds))
+	mux.Handle("POST /api/notif-sound/delete", s.protect(s.handleDeleteNotifSound))
 	mux.Handle("POST /api/upload/chat-bg", s.protect(s.handleUploadChatBG))
 	mux.Handle("POST /api/upload/message-image", s.protect(s.handleUploadMessageImage))
+	mux.Handle("GET /api/stickers", s.protect(s.handleListStickers))
+	mux.Handle("POST /api/upload/sticker", s.protect(s.handleUploadSticker))
+	mux.Handle("POST /api/sticker/delete", s.protect(s.handleDeleteSticker))
 	mux.Handle("GET /api/garden", s.protect(s.handleGarden))
 	mux.Handle("GET /api/weather", s.protect(s.handleWeather))
 	mux.Handle("POST /api/garden/water", s.protect(s.handleWater))
+	mux.Handle("GET /api/game/score", s.protect(s.handleGameScore))
+	mux.Handle("POST /api/game/score", s.protect(s.handleSubmitGameScore))
 	mux.Handle("GET /ws", s.protect(s.handleWS))
 
 	// Uploaded files (avatars, backgrounds, sounds, sent images) are also behind
@@ -385,6 +392,69 @@ func (s *Server) handleWater(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, v)
 }
 
+// --- Game high score -------------------------------------------------------
+
+// gameHigh is the JSON shape for the shared best score: the score plus who set
+// it, so both of us see one leaderboard.
+type gameHigh struct {
+	Score       int    `json:"score"`
+	HolderID    int64  `json:"holderId"`
+	HolderName  string `json:"holderName"`
+	IsNewRecord bool   `json:"isNewRecord,omitempty"`
+}
+
+// loadGameHigh reads the current best and resolves the holder's display name.
+func (s *Server) loadGameHigh() (gameHigh, error) {
+	score, holderID, err := s.st.GameHigh()
+	if err != nil {
+		return gameHigh{}, err
+	}
+	g := gameHigh{Score: score, HolderID: holderID}
+	if holderID > 0 {
+		if u, err := s.st.UserByID(holderID); err == nil {
+			g.HolderName = u.DisplayName
+		}
+	}
+	return g, nil
+}
+
+func (s *Server) handleGameScore(w http.ResponseWriter, r *http.Request) {
+	g, err := s.loadGameHigh()
+	if err != nil {
+		httpError(w, http.StatusInternalServerError, "failed to load high score")
+		return
+	}
+	writeJSON(w, http.StatusOK, g)
+}
+
+// handleSubmitGameScore records a finished game's score, updating the shared
+// best if it was beaten, and returns the (possibly new) leaderboard.
+func (s *Server) handleSubmitGameScore(w http.ResponseWriter, r *http.Request) {
+	me := auth.UserFrom(r.Context())
+	var req struct {
+		Score int `json:"score"`
+	}
+	if !readJSON(w, r, &req) {
+		return
+	}
+	if req.Score < 0 {
+		httpError(w, http.StatusBadRequest, "invalid score")
+		return
+	}
+	isNew, err := s.st.SubmitGameScore(me.ID, req.Score)
+	if err != nil {
+		httpError(w, http.StatusInternalServerError, "failed to save score")
+		return
+	}
+	g, err := s.loadGameHigh()
+	if err != nil {
+		httpError(w, http.StatusInternalServerError, "failed to load high score")
+		return
+	}
+	g.IsNewRecord = isNew
+	writeJSON(w, http.StatusOK, g)
+}
+
 // broadcastProfile tells both clients that a user's public profile (name or
 // photo) changed, so the partner's screen updates without needing a reload.
 func (s *Server) broadcastProfile(u *store.User) {
@@ -414,10 +484,18 @@ const (
 	maxAudioBytes = 5 << 20  // 5 MiB
 )
 
-// saveUpload reads the "file" field of a multipart form, validates its
-// extension against allowed, enforces maxBytes, and writes it into the upload
-// directory under a random name. It returns the public "/uploads/..." path.
+// saveUpload stores an upload in the top-level upload directory. See
+// saveUploadTo for the details.
 func (s *Server) saveUpload(w http.ResponseWriter, r *http.Request, allowed map[string]bool, maxBytes int64) (string, bool) {
+	return s.saveUploadTo(w, r, allowed, maxBytes, "")
+}
+
+// saveUploadTo reads the "file" field of a multipart form, validates its
+// extension against allowed, enforces maxBytes, and writes it under a random
+// name inside <uploads>/<subdir> (subdir "" means the uploads root). It returns
+// the public "/uploads/..." path. The multipart form stays parsed on r, so a
+// caller can still read sibling fields (e.g. a sticker name) afterwards.
+func (s *Server) saveUploadTo(w http.ResponseWriter, r *http.Request, allowed map[string]bool, maxBytes int64, subdir string) (string, bool) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxBytes+1024) // headroom for form overhead
 	if err := r.ParseMultipartForm(maxBytes + 1024); err != nil {
 		httpError(w, http.StatusBadRequest, "file too large or malformed")
@@ -436,13 +514,24 @@ func (s *Server) saveUpload(w http.ResponseWriter, r *http.Request, allowed map[
 		return "", false
 	}
 
+	dir := s.uploadDir
+	pubPrefix := "/uploads/"
+	if subdir != "" {
+		dir = filepath.Join(s.uploadDir, subdir)
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			httpError(w, http.StatusInternalServerError, "failed to prepare folder")
+			return "", false
+		}
+		pubPrefix = "/uploads/" + subdir + "/"
+	}
+
 	name, err := randomName()
 	if err != nil {
 		httpError(w, http.StatusInternalServerError, "failed to name file")
 		return "", false
 	}
 	name += ext
-	dst, err := os.Create(filepath.Join(s.uploadDir, name))
+	dst, err := os.Create(filepath.Join(dir, name))
 	if err != nil {
 		httpError(w, http.StatusInternalServerError, "failed to store file")
 		return "", false
@@ -452,7 +541,7 @@ func (s *Server) saveUpload(w http.ResponseWriter, r *http.Request, allowed map[
 		httpError(w, http.StatusInternalServerError, "failed to write file")
 		return "", false
 	}
-	return "/uploads/" + name, true
+	return pubPrefix + name, true
 }
 
 func (s *Server) handleUploadAvatar(w http.ResponseWriter, r *http.Request) {
@@ -470,17 +559,55 @@ func (s *Server) handleUploadAvatar(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"path": path})
 }
 
+// handleUploadNotifSound adds a sound to my collection. A new message plays one
+// of my sounds at random, so I can keep several.
 func (s *Server) handleUploadNotifSound(w http.ResponseWriter, r *http.Request) {
 	me := auth.UserFrom(r.Context())
-	path, ok := s.saveUpload(w, r, audioExts, maxAudioBytes)
+	path, ok := s.saveUploadTo(w, r, audioExts, maxAudioBytes, "sounds")
 	if !ok {
 		return
 	}
-	if err := s.st.SetNotifSound(me.ID, path); err != nil {
+	sound, err := s.st.AddNotifSound(me.ID, path)
+	if err != nil {
+		s.removeUpload(path)
 		httpError(w, http.StatusInternalServerError, "failed to save sound")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"path": path})
+	writeJSON(w, http.StatusOK, map[string]any{"sound": sound})
+}
+
+// handleListNotifSounds returns my personal notification sounds.
+func (s *Server) handleListNotifSounds(w http.ResponseWriter, r *http.Request) {
+	me := auth.UserFrom(r.Context())
+	list, err := s.st.ListNotifSounds(me.ID)
+	if err != nil {
+		httpError(w, http.StatusInternalServerError, "failed to load sounds")
+		return
+	}
+	if list == nil {
+		list = []*store.NotifSound{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"sounds": list})
+}
+
+// handleDeleteNotifSound removes one of my sounds (row + file).
+func (s *Server) handleDeleteNotifSound(w http.ResponseWriter, r *http.Request) {
+	me := auth.UserFrom(r.Context())
+	var req struct {
+		ID int64 `json:"id"`
+	}
+	if !readJSON(w, r, &req) {
+		return
+	}
+	path, err := s.st.DeleteNotifSound(me.ID, req.ID)
+	if err != nil {
+		httpError(w, http.StatusInternalServerError, "failed to delete sound")
+		return
+	}
+	if path != "" {
+		s.removeUpload(path)
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
 func (s *Server) handleUploadChatBG(w http.ResponseWriter, r *http.Request) {
@@ -504,6 +631,87 @@ func (s *Server) handleUploadMessageImage(w http.ResponseWriter, r *http.Request
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"path": path})
+}
+
+// --- Stickers --------------------------------------------------------------
+
+const maxStickerNameLen = 40
+
+// handleListStickers returns every saved sticker (shared between both accounts).
+func (s *Server) handleListStickers(w http.ResponseWriter, r *http.Request) {
+	list, err := s.st.ListStickers()
+	if err != nil {
+		httpError(w, http.StatusInternalServerError, "failed to load stickers")
+		return
+	}
+	if list == nil {
+		list = []*store.Sticker{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"stickers": list})
+}
+
+// handleUploadSticker saves a new sticker: an image or gif plus a name (Chinese
+// or English). Once saved it's available to both of us.
+func (s *Server) handleUploadSticker(w http.ResponseWriter, r *http.Request) {
+	me := auth.UserFrom(r.Context())
+	// The file is validated and stored first; the name rides alongside it in the
+	// same multipart form, read once ParseMultipartForm has run inside saveUploadTo.
+	path, ok := s.saveUploadTo(w, r, imageExts, maxImageBytes, "stickers")
+	if !ok {
+		return
+	}
+	name := strings.TrimSpace(r.FormValue("name"))
+	if name == "" {
+		s.removeUpload(path) // don't leave an orphaned file behind
+		httpError(w, http.StatusBadRequest, "please give the sticker a name")
+		return
+	}
+	if len([]rune(name)) > maxStickerNameLen {
+		s.removeUpload(path)
+		httpError(w, http.StatusBadRequest, "that name is a little too long")
+		return
+	}
+	sticker, err := s.st.AddSticker(name, me.ID, path)
+	if err != nil {
+		s.removeUpload(path)
+		httpError(w, http.StatusInternalServerError, "failed to save sticker")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"sticker": sticker})
+}
+
+// handleDeleteSticker removes a sticker (row + file). Either partner may delete,
+// since stickers are shared between the two of us.
+func (s *Server) handleDeleteSticker(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ID int64 `json:"id"`
+	}
+	if !readJSON(w, r, &req) {
+		return
+	}
+	path, err := s.st.DeleteSticker(req.ID)
+	if err != nil {
+		httpError(w, http.StatusInternalServerError, "failed to delete sticker")
+		return
+	}
+	if path != "" {
+		s.removeUpload(path)
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// removeUpload deletes a stored upload given its public "/uploads/..." path. It
+// stays safely inside the upload directory and ignores anything that isn't an
+// upload path.
+func (s *Server) removeUpload(pubPath string) {
+	if !strings.HasPrefix(pubPath, "/uploads/") {
+		return
+	}
+	rel := strings.TrimPrefix(pubPath, "/uploads/")
+	full := filepath.Join(s.uploadDir, filepath.Clean("/"+rel))
+	if err := os.Remove(full); err != nil && !os.IsNotExist(err) {
+		log.Printf("could not remove upload %s: %v", pubPath, err)
+	}
 }
 
 // --- small helpers ---------------------------------------------------------

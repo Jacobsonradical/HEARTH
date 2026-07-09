@@ -39,10 +39,14 @@ export function apiPost(path, body) {
   }).then(handle)
 }
 
-// apiUpload posts a single file under the form field "file".
-export function apiUpload(path, file) {
+// apiUpload posts a single file under the form field "file", plus any extra
+// string fields (e.g. a sticker name) passed in the optional fields object.
+export function apiUpload(path, file, fields) {
   const form = new FormData()
   form.append('file', file)
+  if (fields) {
+    for (const key of Object.keys(fields)) form.append(key, fields[key])
+  }
   return fetch(path, { method: 'POST', body: form }).then(handle)
 }
 
